@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import SignInButton from "@/components/SignInButton";
+import SignInButton from "@/components/auth/SignInButton";
 
 import {
   NavigationMenu,
