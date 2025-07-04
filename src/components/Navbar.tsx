@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import SignInButton from "@/components/auth/SignInButton";
+import { AuthButton } from "@/components/auth/AuthButton";
 
 import {
   NavigationMenu,
@@ -16,7 +16,7 @@ export function Navbar() {
       <NavigationMenuList>
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
-            <SignInButton />
+            <AuthButton />
           </NavigationMenuLink>
         </NavigationMenuItem>
       </NavigationMenuList>

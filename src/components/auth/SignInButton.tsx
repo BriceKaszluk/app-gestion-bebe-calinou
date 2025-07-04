@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { LogIn } from 'lucide-react';
 
-export default function SignIn() {
+export function SignInButton() {
   return (
     <Button onClick={() => signIn("google")} variant="outline" size="sm">
       <div className="flex items-center">
