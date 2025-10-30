@@ -7,12 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Heart } from "lucide-react"; // icône ❤️
+import Image from "next/image";
+import ImagePreview from "@/components/ImagePreview";
 
 type Entry = {
   _id: string;
   message: string;
   createdAt: string;
-  favorite?: boolean; // Nouveau champ local
+  favorite?: boolean;
+  imagePath?: string;      // chemin du fichier Supabase (stocké en base)
+  signedUrl?: string;      // URL signée temporaire (générée côté serveur)
 };
 
 type Filter = "all" | "today" | "week";
@@ -22,36 +26,114 @@ export default function Journal() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [file, setFile] = useState<File | null>(null);
 
   // Charger les entrées existantes
-  useEffect(() => {
-    fetch("/api/journal")
-      .then((res) => res.json())
-      .then((data) => setEntries(data))
-      .catch(console.error);
-  }, []);
+useEffect(() => {
+  async function loadEntries() {
+    const cacheKey = "journalCache";
+    const cacheData = localStorage.getItem(cacheKey);
+
+    if (cacheData) {
+      const parsed = JSON.parse(cacheData);
+      if (Date.now() < parsed.expiresAt) {
+        setEntries(parsed.data);
+        return;
+      }
+    }
+
+    const res = await fetch("/api/journal");
+    const data = await res.json();
+
+    if (!res.ok) return;
+
+    // On complète les entrées avec les URLs signées
+    const withUrls = await Promise.all(
+      data.map(async (entry: Entry) => {
+        if (!entry.imagePath) return entry;
+
+        const urlRes = await fetch("/api/journal/CreateImageSignedUrl", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: entry.imagePath }),
+        });
+
+        const { url } = await urlRes.json();
+        return { ...entry, signedUrl: url };
+      })
+    );
+
+    setEntries(withUrls);
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        data: withUrls,
+        expiresAt: Date.now() + 55 * 60 * 1000, // cache 55 min
+      })
+    );
+  }
+
+  loadEntries();
+}, []);
 
   // Envoi du message
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!message.trim()) return;
+async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  if (!message.trim()) return;
 
-    setLoading(true);
-    const res = await fetch("/api/journal", {
+  setLoading(true);
+
+  // 1️⃣ Création du message texte
+  const res = await fetch("/api/journal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+
+  if (!res.ok) {
+    alert("Erreur lors de l’enregistrement.");
+    setLoading(false);
+    return;
+  }
+
+  const newEntry = await res.json();
+
+  // 2️⃣ Upload de l’image si elle existe
+  if (file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("entryId", newEntry._id);
+
+    const uploadRes = await fetch("/api/journal/uploadDiaryImage", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: formData,
     });
 
-    if (res.ok) {
-      const newEntry = await res.json();
-      setEntries([newEntry, ...entries]);
-      setMessage("");
-    } else {
-      alert("Erreur lors de l’enregistrement.");
+    if (uploadRes.ok) {
+      const uploadData = await uploadRes.json();
+
+      // 3️⃣ Création d’une URL signée pour affichage immédiat
+      const urlRes = await fetch("/api/journal/CreateImageSignedUrl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: uploadData.path }),
+      });
+
+      const { url } = await urlRes.json();
+
+      newEntry.imagePath = uploadData.path;
+      newEntry.signedUrl = url;
     }
-    setLoading(false);
   }
+
+  // 4️⃣ Ajout local + reset
+  setEntries([newEntry, ...entries]);
+  setMessage("");
+  setFile(null);
+  setLoading(false);
+  localStorage.removeItem("journalCache"); // force le refresh cache
+}
+
 
   // Filtrage par date
   const filteredEntries = entries.filter((entry) => {
@@ -104,6 +186,13 @@ const toggleFavorite = async (id: string) => {
             placeholder="Écris un souvenir ou un moment mignon..."
             rows={3}
           />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="text-sm"
+          />
+          <ImagePreview file={file} />
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Envoi..." : "Ajouter au journal"}
           </Button>
@@ -146,33 +235,46 @@ const toggleFavorite = async (id: string) => {
           )}
 
           <div className="space-y-3">
-            {filteredEntries.map((entry) => (
-              <Card
-                key={entry._id}
-                className={cn(
-                  "bg-white shadow-sm border relative",
-                  entry.favorite && "border-pink-400"
-                )}
-              >
-                <CardContent className="p-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleFavorite(entry._id)}
-                    className="absolute top-2 right-2 text-gray-400 hover:text-pink-500 transition"
-                  >
-                    <Heart
-                      size={18}
-                      fill={entry.favorite ? "rgb(236,72,153)" : "none"}
-                    />
-                  </button>
+          {filteredEntries.map((entry) => (
+            <Card
+              key={entry._id}
+              className={cn(
+                "bg-white shadow-sm border relative",
+                entry.favorite && "border-pink-400"
+              )}
+            >
+              <CardContent className="p-3">
+                <button
+                  type="button"
+                  onClick={() => toggleFavorite(entry._id)}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-pink-500 transition"
+                >
+                  <Heart
+                    size={18}
+                    fill={entry.favorite ? "rgb(236,72,153)" : "none"}
+                  />
+                </button>
 
-                  <p className="pr-6">{entry.message}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(entry.createdAt).toLocaleString("fr-FR")}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+                {/* 🖼️ Image si elle existe */}
+                {entry.signedUrl && (
+                  <div className="relative w-full h-64 mb-2 overflow-hidden rounded-md">
+                    <Image
+                      src={entry.signedUrl}
+                      alt="Souvenir de bébé"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      priority={false}
+                    />
+                  </div>
+                )}
+                <p className="pr-6">{entry.message}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {new Date(entry.createdAt).toLocaleString("fr-FR")}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
           </div>
         </ScrollArea>
       </CardContent>
