@@ -1,12 +1,13 @@
 export const runtime = "nodejs";
-// app/api/auth/[...nextauth]/route.ts
-import NextAuth from "next-auth"
-import Google from "next-auth/providers/google"
-import { MongoDBAdapter } from "@auth/mongodb-adapter"
-import clientPromise from "@/lib/mongodb"
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: MongoDBAdapter(await clientPromise),
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
+import { MongoDBAdapter } from "@auth/mongodb-adapter";
+import clientPromise from "@/lib/mongodb";
+
+// ✅ Création de NextAuth avec déstructuration explicite
+const { handlers } = NextAuth({
+  adapter: MongoDBAdapter(clientPromise),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -15,11 +16,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: { strategy: "jwt" },
   callbacks: {
-    async session({ session, user }) {
-      if (user) session.user.id = user.id
-      return session
+    async session({ session }) {
+      return session;
     },
   },
-})
+});
 
-export const { GET, POST } = handlers
+// ✅ Export propre des méthodes HTTP attendues par Next.js
+export const { GET, POST } = handlers;
