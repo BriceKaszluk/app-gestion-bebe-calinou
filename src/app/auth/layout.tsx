@@ -11,7 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   // ❌ Si non connecté
-  if (status === "unauthenticated") {
+  if (status === "unauthenticated" || !session) {
     redirect("/");
     return null; // on ne rend rien après redirection
   }
