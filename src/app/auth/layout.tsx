@@ -3,21 +3,23 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { data: session, status } = useSession();
+  const { data: session, status } = useSession();
 
-  // ⏳ Pendant le chargement
+  // ⏳ En cours de chargement
   if (status === "loading") {
     return <p>Chargement de la session...</p>;
   }
 
-  // ❌ Si l'utilisateur n'est pas connecté
+  // ❌ Si non connecté
   if (status === "unauthenticated" || !session) {
-    redirect("/"); // ou return <p>Non autorisé</p>
+    redirect("/");
+    return null; // on ne rend rien après redirection
   }
 
+  // ✅ Si connecté
   return (
     <section className="p-4">
       <main>{children}</main>
     </section>
-  )
+  );
 }
