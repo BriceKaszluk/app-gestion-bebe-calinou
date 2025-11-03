@@ -9,6 +9,10 @@ const withPWAConfig = withPWA({
   disable: process.env.NODE_ENV === "development", // désactivé en dev
 });
 
+export const experimental = {
+  optimizeCss: true,
+};
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
