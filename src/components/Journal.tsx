@@ -12,18 +12,59 @@ export default function Journal() {
   const [filter, setFilter] = useState<Filter>("all");
   const [sending, setSending] = useState(false);
 
+  // ✅ Gestion message + upload image Supabase
   const handleSubmit = async (message: string, file: File | null) => {
     setSending(true);
-    const res = await fetch("/api/journal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
-    const newEntry = await res.json();
-    setEntries((prev) => [newEntry, ...prev]);
-    setSending(false);
+
+    try {
+      // 🔹 1. Création de l’entrée texte
+      const res = await fetch("/api/journal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+
+      if (!res.ok) throw new Error("Erreur lors de la création du message");
+      const newEntry = await res.json();
+
+      // 🔹 2. Upload image si présente
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("entryId", newEntry._id);
+
+        const uploadRes = await fetch("/api/journal/uploadDiaryImage", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+
+          // 🔹 3. Création d’une URL signée temporaire
+          const urlRes = await fetch("/api/journal/CreateImageSignedUrl", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: uploadData.path }),
+          });
+
+          const { url } = await urlRes.json();
+          newEntry.imagePath = uploadData.path;
+          newEntry.signedUrl = url;
+        }
+      }
+
+      // 🔹 4. Mise à jour du state local
+      setEntries((prev) => [newEntry, ...prev]);
+    } catch (error) {
+      console.error("Erreur dans handleSubmit:", error);
+      alert("Une erreur est survenue lors de l’envoi.");
+    } finally {
+      setSending(false);
+    }
   };
 
+  // ❤️ Favoris
   const toggleFavorite = async (id: string) => {
     setEntries((prev) =>
       prev.map((e) => (e._id === id ? { ...e, favorite: !e.favorite } : e))
@@ -31,6 +72,7 @@ export default function Journal() {
     await fetch(`/api/journal/${id}/favorite`, { method: "PATCH" });
   };
 
+  // 🔍 Filtrage
   const filtered = entries.filter((entry) => {
     const d = new Date(entry.createdAt);
     const now = new Date();
@@ -49,7 +91,11 @@ export default function Journal() {
       <CardContent className="space-y-4">
         <JournalForm onSubmit={handleSubmit} loading={sending} />
         <JournalFilters filter={filter} setFilter={setFilter} />
-        <JournalList entries={filtered} loading={loading} toggleFavorite={toggleFavorite} />
+        <JournalList
+          entries={filtered}
+          loading={loading}
+          toggleFavorite={toggleFavorite}
+        />
       </CardContent>
     </Card>
   );
