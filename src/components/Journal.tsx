@@ -82,21 +82,30 @@ export default function Journal() {
   });
 
   return (
-    <Card className="mx-auto w-full max-w-md sm:max-w-lg md:max-w-2xl p-4 sm:p-6 rounded-2xl shadow-md bg-white">
-      <CardHeader>
-        <CardTitle className="text-lg sm:text-xl font-semibold text-center">
-          Journal de bébé 🍼
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <JournalForm onSubmit={handleSubmit} loading={sending} />
-        <JournalFilters filter={filter} setFilter={setFilter} />
-        <JournalList
-          entries={filtered}
-          loading={loading}
-          toggleFavorite={toggleFavorite}
-        />
-      </CardContent>
-    </Card>
+<Card
+  className="
+    w-full                 /* pleine largeur dans le conteneur centré */
+    max-w-none             /* pas de limite sur mobile */
+    sm:max-w-lg md:max-w-2xl
+    p-3 sm:p-6 rounded-2xl shadow-md bg-white mx-auto
+  "
+>
+  <CardHeader>
+    <CardTitle className="text-lg sm:text-xl font-semibold text-center">
+      Journal de bébé 🍼
+    </CardTitle>
+  </CardHeader>
+
+  <CardContent className="space-y-4">
+    <JournalForm onSubmit={handleSubmit} loading={sending} />
+    <JournalFilters filter={filter} setFilter={setFilter} />
+    <JournalList
+      entries={filtered}
+      loading={loading}
+      toggleFavorite={toggleFavorite}
+    />
+  </CardContent>
+</Card>
+
   );
 }

@@ -10,10 +10,32 @@ type Props = {
 
 export default function JournalFilters({ filter, setFilter }: Props) {
   const filters: Filter[] = ["all", "today", "week"];
+
+  const labelMap: Record<Filter, string> = {
+    all: "Tous",
+    today: "Aujourd’hui",
+    week: "7 jours",
+  };
+
   return (
-    <div className="flex flex-wrap justify-between items-center gap-2 sm:gap-4">
+    <div className="flex flex-wrap justify-between items-center gap-2 sm:gap-4 w-full">
       <p className="text-sm text-gray-600">Filtrer :</p>
-      <div className="flex flex-wrap gap-2">
+
+      {/* 🧭 Mobile : menu déroulant */}
+      <select
+        value={filter}
+        onChange={(e) => setFilter(e.target.value as Filter)}
+        className="block sm:hidden w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
+      >
+        {filters.map((f) => (
+          <option key={f} value={f}>
+            {labelMap[f]}
+          </option>
+        ))}
+      </select>
+
+      {/* 💻 Desktop : boutons */}
+      <div className="hidden sm:flex flex-wrap gap-2">
         {filters.map((f) => (
           <Button
             key={f}
@@ -21,7 +43,7 @@ export default function JournalFilters({ filter, setFilter }: Props) {
             size="sm"
             onClick={() => setFilter(f)}
           >
-            {f === "all" ? "Tous" : f === "today" ? "Aujourd’hui" : "7 jours"}
+            {labelMap[f]}
           </Button>
         ))}
       </div>
