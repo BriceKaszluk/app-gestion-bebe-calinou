@@ -25,8 +25,27 @@ export default function BabyTimePad() {
 
   // état spécial pour la sieste en cours
   const [napStart, setNapStart] = useState<Date | null>(null);
+  const [elapsedNap, setElapsedNap] = useState<string>("");
 
-  // Charger les derniers événements
+  // --- actualise la durée de la sieste toutes les minutes
+  useEffect(() => {
+    if (!napStart) return;
+
+    const updateElapsed = () => {
+      const diff = Date.now() - napStart.getTime();
+      const min = Math.floor(diff / 60000);
+      const h = Math.floor(min / 60);
+      const display =
+        h > 0 ? `${h}h${min % 60 > 0 ? ` ${min % 60}min` : ""}` : `${min} min`;
+      setElapsedNap(display);
+    };
+
+    updateElapsed(); // première exécution immédiate
+    const interval = setInterval(updateElapsed, 60_000);
+    return () => clearInterval(interval);
+  }, [napStart]);
+
+  // --- recharge les derniers événements en base
   useEffect(() => {
     (async () => {
       const updated = await Promise.all(
@@ -44,20 +63,29 @@ export default function BabyTimePad() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- met à jour automatiquement tous les timers chaque minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActions((prev) => [...prev]); // force re-render
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- clic sur un bouton
   const handlePress = async (id: string) => {
     const now = new Date();
 
     // 💤 Cas spécial : sieste
     if (id === "sieste") {
       if (!napStart) {
-        // Démarrage d'une sieste
+        // début de sieste
         setNapStart(now);
       } else {
-        // Fin de la sieste
+        // fin de sieste
         const duration = Math.floor((now.getTime() - napStart.getTime()) / 60000);
         setNapStart(null);
+        setElapsedNap("");
 
-        // Enregistrement du début et de la fin
         await fetch("/api/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -68,7 +96,6 @@ export default function BabyTimePad() {
           }),
         });
 
-        // MAJ du bouton localement
         setActions((prev) =>
           prev.map((a) =>
             a.id === "sieste" ? { ...a, time: now } : a
@@ -92,13 +119,17 @@ export default function BabyTimePad() {
     });
   };
 
+  // --- calcul du temps écoulé depuis un event
   const getElapsed = (time?: Date) => {
     if (!time) return "—";
     const diff = Date.now() - time.getTime();
     const min = Math.floor(diff / 60000);
     if (min < 60) return `il y a ${min} min`;
     const h = Math.floor(min / 60);
-    if (h < 24) return `il y a ${h} h`;
+    if (h < 24) {
+      const rest = min % 60;
+      return rest > 0 ? `il y a ${h}h ${rest}min` : `il y a ${h}h`;
+    }
     const d = Math.floor(h / 24);
     return `il y a ${d} j`;
   };
@@ -120,9 +151,10 @@ export default function BabyTimePad() {
           >
             <span className="text-3xl mb-1">{a.icon}</span>
             <span>{a.label}</span>
+
             {a.id === "sieste" && napStart ? (
-              <span className="text-xs text-yellow-600 animate-pulse">
-                Sieste en cours...
+              <span className="text-xs text-yellow-700">
+                Sieste en cours : {elapsedNap}
               </span>
             ) : (
               <span className="text-xs text-gray-500">{getElapsed(a.time)}</span>
