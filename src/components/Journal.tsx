@@ -76,6 +76,8 @@ export default function Journal() {
   const filtered = entries.filter((entry) => {
     const d = new Date(entry.createdAt);
     const now = new Date();
+    if (filter === "important") return entry.favorite;
+
     if (filter === "today") return d.toDateString() === now.toDateString();
     if (filter === "week") return (now.getTime() - d.getTime()) / 86400000 <= 7;
     return true;

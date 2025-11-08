@@ -28,7 +28,7 @@ export default function JournalForm({ onSubmit, loading }: Props) {
       <Textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        placeholder="Écris un souvenir ou un moment mignon..."
+        placeholder="Ajoutez une info rapide ou un message pour l’autre parent (ex : bib 150ml à 7h20, petite fièvre, nouvelle photo...)"
         rows={3}
       />
       <input
@@ -44,7 +44,7 @@ export default function JournalForm({ onSubmit, loading }: Props) {
         className="w-full flex items-center justify-center gap-2"
       >
         {loading && <Loader2 className="animate-spin h-4 w-4" />}
-        {loading ? "Envoi en cours..." : "Ajouter au journal"}
+        {loading ? "Ajout en cours..." : "Ajouter une note"}
       </Button>
     </form>
   );

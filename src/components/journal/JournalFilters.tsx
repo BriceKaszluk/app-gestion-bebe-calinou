@@ -9,17 +9,19 @@ type Props = {
 };
 
 export default function JournalFilters({ filter, setFilter }: Props) {
-  const filters: Filter[] = ["all", "today", "week"];
+  // 🆕 Ajout du filtre important
+  const filters: Filter[] = ["all", "today", "week", "important"];
 
   const labelMap: Record<Filter, string> = {
     all: "Tous",
     today: "Aujourd’hui",
     week: "7 jours",
+    important: "Important",
   };
 
   return (
     <div className="flex flex-wrap justify-between items-center gap-2 sm:gap-4 w-full">
-      <p className="text-sm text-gray-600">Filtrer :</p>
+      <p className="text-sm text-gray-600">Afficher :</p>
 
       {/* 🧭 Mobile : menu déroulant */}
       <select

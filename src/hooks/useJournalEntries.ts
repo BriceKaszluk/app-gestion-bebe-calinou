@@ -11,7 +11,8 @@ export type Entry = {
   signedUrl?: string;
 };
 
-export type Filter = "all" | "today" | "week";
+// ✅ On ajoute "important" ici
+export type Filter = "all" | "today" | "week" | "important";
 
 export function useJournalEntries() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -50,11 +51,13 @@ export function useJournalEntries() {
 
       setEntries(withUrls);
       setLoading(false);
+
+      // ✅ Cache local pour performance
       localStorage.setItem(
         cacheKey,
         JSON.stringify({
           data: withUrls,
-          expiresAt: Date.now() + 55 * 60 * 1000,
+          expiresAt: Date.now() + 55 * 60 * 1000, // 55 min
         })
       );
     };
