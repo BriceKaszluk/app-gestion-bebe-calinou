@@ -11,26 +11,25 @@ type BabyAction = {
   icon: string;
   color: string;
   time?: Date;
+  duration?: number;
 };
 
 export default function BabyTimePad() {
   const [actions, setActions] = useState<BabyAction[]>([
     { id: "biberon", label: "Biberon", icon: "🍼", color: "bg-blue-100" },
-    { id: "sieste", label: "Sieste", icon: "😴", color: "bg-yellow-100" },
+    { id: "dodo", label: "Dodo", icon: "💤", color: "bg-yellow-100" },
     { id: "repas", label: "Repas", icon: "🍽️", color: "bg-green-100" },
     { id: "caca", label: "Caca", icon: "💩", color: "bg-orange-100" },
     { id: "pipi", label: "Pipi", icon: "💧", color: "bg-cyan-100" },
     { id: "bain", label: "Bain", icon: "🛁", color: "bg-purple-100" },
   ]);
 
-  // état spécial pour la sieste en cours
   const [napStart, setNapStart] = useState<Date | null>(null);
   const [elapsedNap, setElapsedNap] = useState<string>("");
 
-  // --- actualise la durée de la sieste toutes les minutes
+  // 🕒 actualise la durée du dodo en cours
   useEffect(() => {
     if (!napStart) return;
-
     const updateElapsed = () => {
       const diff = Date.now() - napStart.getTime();
       const min = Math.floor(diff / 60000);
@@ -39,22 +38,30 @@ export default function BabyTimePad() {
         h > 0 ? `${h}h${min % 60 > 0 ? ` ${min % 60}min` : ""}` : `${min} min`;
       setElapsedNap(display);
     };
-
-    updateElapsed(); // première exécution immédiate
+    updateElapsed();
     const interval = setInterval(updateElapsed, 60_000);
     return () => clearInterval(interval);
   }, [napStart]);
 
-  // --- recharge les derniers événements en base
+  // 🔄 recharge les derniers events
   useEffect(() => {
     (async () => {
       const updated = await Promise.all(
         actions.map(async (a) => {
           const res = await fetch(`/api/events?type=${a.id}`);
           const data = await res.json();
+          const last = data.last;
           return {
             ...a,
-            time: data.last?.startedAt ? new Date(data.last.startedAt) : undefined,
+            time: last?.startedAt ? new Date(last.startedAt) : undefined,
+            duration:
+              a.id === "dodo" && last?.endedAt
+                ? Math.floor(
+                    (new Date(last.endedAt).getTime() -
+                      new Date(last.startedAt).getTime()) /
+                      60000
+                  )
+                : undefined,
           };
         })
       );
@@ -63,25 +70,22 @@ export default function BabyTimePad() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- met à jour automatiquement tous les timers chaque minute
+  // 🧭 auto-refresh toutes les minutes
   useEffect(() => {
     const interval = setInterval(() => {
-      setActions((prev) => [...prev]); // force re-render
+      setActions((prev) => [...prev]);
     }, 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  // --- clic sur un bouton
   const handlePress = async (id: string) => {
     const now = new Date();
 
-    // 💤 Cas spécial : sieste
-    if (id === "sieste") {
+    // 😴 Dodo spécial : start / stop
+    if (id === "dodo") {
       if (!napStart) {
-        // début de sieste
         setNapStart(now);
       } else {
-        // fin de sieste
         const duration = Math.floor((now.getTime() - napStart.getTime()) / 60000);
         setNapStart(null);
         setElapsedNap("");
@@ -90,7 +94,7 @@ export default function BabyTimePad() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type: "sieste",
+            type: "dodo",
             startedAt: napStart,
             endedAt: now,
           }),
@@ -98,16 +102,14 @@ export default function BabyTimePad() {
 
         setActions((prev) =>
           prev.map((a) =>
-            a.id === "sieste" ? { ...a, time: now } : a
+            a.id === "dodo" ? { ...a, time: now, duration } : a
           )
         );
-
-        console.log(`⏱️ Sieste de ${duration} minutes enregistrée`);
       }
       return;
     }
 
-    // 🌟 Autres boutons classiques
+    // 🍼 Autres boutons
     setActions((prev) =>
       prev.map((a) => (a.id === id ? { ...a, time: now } : a))
     );
@@ -119,7 +121,6 @@ export default function BabyTimePad() {
     });
   };
 
-  // --- calcul du temps écoulé depuis un event
   const getElapsed = (time?: Date) => {
     if (!time) return "—";
     const diff = Date.now() - time.getTime();
@@ -134,6 +135,13 @@ export default function BabyTimePad() {
     return `il y a ${d} j`;
   };
 
+  const formatDuration = (min?: number) => {
+    if (!min) return "";
+    const h = Math.floor(min / 60);
+    const rest = min % 60;
+    return h > 0 ? `${h}h${rest > 0 ? ` ${rest}min` : ""}` : `${rest} min`;
+  };
+
   return (
     <Card className="w-full max-w-2xl bg-white shadow-md rounded-2xl p-4">
       <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -143,21 +151,26 @@ export default function BabyTimePad() {
             onClick={() => handlePress(a.id)}
             variant="outline"
             className={cn(
-              "flex flex-col items-center justify-center h-28 sm:h-32 text-center text-sm font-medium rounded-2xl border border-gray-200 transition-all duration-200",
+              "flex flex-col items-center justify-center h-28 sm:h-32 text-center font-medium rounded-2xl border border-gray-200 transition-all duration-200",
               a.color,
               "hover:scale-105 active:scale-95",
-              a.id === "sieste" && napStart ? "border-yellow-400 bg-yellow-50" : ""
+              a.id === "dodo" && napStart ? "border-yellow-400 bg-yellow-50" : ""
             )}
           >
             <span className="text-3xl mb-1">{a.icon}</span>
-            <span>{a.label}</span>
+            <span className="text-sm sm:text-base">{a.label}</span>
 
-            {a.id === "sieste" && napStart ? (
-              <span className="text-xs text-yellow-700">
-                Sieste en cours : {elapsedNap}
+            {a.id === "dodo" && napStart ? (
+              <span className="text-[11px] sm:text-xs text-yellow-700 mt-1 max-w-[90%] truncate">
+                Dodo en cours : {elapsedNap}
               </span>
             ) : (
-              <span className="text-xs text-gray-500">{getElapsed(a.time)}</span>
+              <span className="text-[11px] sm:text-xs text-gray-600 mt-1 max-w-[90%] text-center leading-tight truncate">
+                {getElapsed(a.time)}
+                {a.id === "dodo" && a.duration
+                  ? ` — ${formatDuration(a.duration)}`
+                  : ""}
+              </span>
             )}
           </Button>
         ))}
