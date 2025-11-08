@@ -21,7 +21,7 @@ type BabyDoc = {
   invites?: Invite[];
 };
 
-/** GET: liste les bébés du parent connecté */
+/** GET: liste les bébés visibles par le parent connecté */
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email)
@@ -30,9 +30,23 @@ export async function GET() {
   const client = await clientPromise;
   const db = client.db("calinou");
 
+  // 💡 On affiche uniquement les bébés où l’utilisateur est parent
+  //    ou possède une invitation encore valide (pending/accepted)
   const babies = await db
     .collection<BabyDoc>("babies")
-    .find({ "parents.email": session.user.email })
+    .find({
+      $or: [
+        { "parents.email": session.user.email },
+        {
+          invites: {
+            $elemMatch: {
+              email: session.user.email,
+              status: { $in: ["pending", "accepted"] },
+            },
+          },
+        },
+      ],
+    })
     .sort({ createdAt: 1 })
     .toArray();
 
@@ -48,54 +62,49 @@ export async function POST(req: Request) {
 
     const { babyId, email } = await req.json();
     if (!babyId || !email)
-      return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Paramètres manquants" },
+        { status: 400 }
+      );
 
     const client = await clientPromise;
     const db = client.db("calinou");
 
-    // Vérifie que le parent actuel est bien lié à ce bébé
     const baby = await db.collection<BabyDoc>("babies").findOne({
       _id: new ObjectId(babyId),
       "parents.email": session.user.email,
     });
 
-    if (!baby) {
+    if (!baby)
       return NextResponse.json(
         { error: "Bébé introuvable ou accès refusé" },
         { status: 403 }
       );
-    }
 
-    // 🧩 Vérifie si la personne est déjà parent de CE bébé
     const alreadyParent = (baby.parents ?? []).some(
       (p: Parent) => p.email === email
     );
-    if (alreadyParent) {
+    if (alreadyParent)
       return NextResponse.json(
         { error: "Ce parent est déjà ajouté à ce bébé" },
         { status: 409 }
       );
-    }
 
-    // 📨 Vérifie si une invitation existe déjà pour CE bébé uniquement
     const alreadyInvited = (baby.invites ?? []).some(
       (i: Invite) => i.email === email && i.status === "pending"
     );
-    if (alreadyInvited) {
+    if (alreadyInvited)
       return NextResponse.json(
         { error: "Invitation déjà envoyée pour ce bébé" },
         { status: 409 }
       );
-    }
 
-    // 🔍 L'utilisateur invité s'est-il déjà connecté à Calinou ?
     const existingUser = await db.collection("users").findOne({ email });
 
     if (existingUser) {
-      // ✅ Ajout direct s’il est déjà inscrit
       const addParent: UpdateFilter<BabyDoc> = {
         $addToSet: { parents: { email } },
-        $pull: { invites: { email } }, // Nettoie une éventuelle ancienne invitation
+        $pull: { invites: { email } },
       };
       await db
         .collection<BabyDoc>("babies")
@@ -106,7 +115,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 🕓 Sinon, création d’une invitation différée
     const invite: Invite = {
       email,
       invitedBy: session.user.email,
@@ -132,7 +140,7 @@ export async function POST(req: Request) {
   }
 }
 
-/** DELETE: supprime un parent du profil bébé */
+/** DELETE: révoque complètement un parent */
 export async function DELETE(req: Request) {
   try {
     const session = await auth();
@@ -141,41 +149,47 @@ export async function DELETE(req: Request) {
 
     const { babyId, email } = await req.json();
     if (!babyId || !email)
-      return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Paramètres manquants" },
+        { status: 400 }
+      );
 
     const client = await clientPromise;
     const db = client.db("calinou");
 
     const baby = await db.collection<BabyDoc>("babies").findOne({
       _id: new ObjectId(babyId),
-      "parents.email": session.user.email,
     });
 
     if (!baby)
+      return NextResponse.json({ error: "Bébé introuvable" }, { status: 404 });
+
+    const creatorEmail = baby.parents[0]?.email;
+    if (creatorEmail !== session.user.email)
       return NextResponse.json(
-        { error: "Bébé introuvable ou accès refusé" },
+        { error: "Seul le créateur peut révoquer un accès" },
         { status: 403 }
       );
 
-    // 🚫 Empêche la suppression du dernier parent
-    if (baby.parents.length <= 1)
+    if (email === creatorEmail)
       return NextResponse.json(
-        { error: "Impossible de supprimer le dernier parent" },
+        { error: "Impossible de révoquer le créateur" },
         { status: 400 }
       );
 
-    // ✅ Supprime proprement le parent ciblé
-    const pullParent: UpdateFilter<BabyDoc> = {
-      $pull: { parents: { email } },
-    };
+    // 💡 Supprime le parent et marque l’invitation comme révoquée si elle existe
+    await db.collection("babies").updateOne(
+      { _id: new ObjectId(babyId) },
+      {
+        $pull: { parents: { email } },
+        $set: { "invites.$[elem].status": "revoked" },
+      },
+      { arrayFilters: [{ "elem.email": email }] }
+    );
 
-    await db
-      .collection<BabyDoc>("babies")
-      .updateOne({ _id: new ObjectId(babyId) }, pullParent);
-
-    return NextResponse.json({ message: "Parent supprimé avec succès" });
+    return NextResponse.json({ message: "Accès révoqué avec succès" });
   } catch (error) {
-    console.error("Erreur suppression parent:", error);
+    console.error("Erreur révocation parent:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

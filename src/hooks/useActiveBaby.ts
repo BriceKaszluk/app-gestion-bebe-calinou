@@ -6,11 +6,11 @@ export function useActiveBaby() {
   const [activeBabyId, setActiveBabyId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Charger depuis localStorage
+    // 🔹 Charger le bébé actif depuis le localStorage
     const saved = localStorage.getItem("activeBabyId");
     if (saved) setActiveBabyId(saved);
 
-    // Réagir à un changement venant d'un autre composant
+    // 🔹 Écoute les changements globaux (d’un autre onglet ou composant)
     const handleChange = () => {
       const id = localStorage.getItem("activeBabyId");
       setActiveBabyId(id);
@@ -20,9 +20,13 @@ export function useActiveBaby() {
     return () => window.removeEventListener("babyChange", handleChange);
   }, []);
 
-  // Fonction pratique pour changer le bébé actif
-  const updateBabyId = (id: string) => {
-    localStorage.setItem("activeBabyId", id);
+  // ✅ Mise à jour centralisée et synchronisée
+  const updateBabyId = (id: string | null) => {
+    if (id) {
+      localStorage.setItem("activeBabyId", id);
+    } else {
+      localStorage.removeItem("activeBabyId");
+    }
     setActiveBabyId(id);
     window.dispatchEvent(new Event("babyChange"));
   };
