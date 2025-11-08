@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import InviteParentDialog from "@/components/babies/InviteParentDialog";
 import { useActiveBaby } from "@/hooks/useActiveBaby";
 import {
   Select,
@@ -90,49 +91,58 @@ export default function BabySelector() {
     );
   }
 
-  return (
-    <div className="flex items-center gap-2 mb-4 w-full max-w-xs mx-auto">
-      <Select value={activeBaby || ""} onValueChange={handleChange}>
-        <SelectTrigger className="w-full bg-white border border-gray-200 shadow-sm">
-          <SelectValue placeholder="Sélectionner un bébé" />
-        </SelectTrigger>
-        <SelectContent>
-          {babies.map((b) => (
-            <SelectItem key={b._id} value={b._id}>
-              {b.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+return (
+  <div className="flex items-center gap-2 mb-4 w-full max-w-xs mx-auto">
+    <Select value={activeBaby || ""} onValueChange={handleChange}>
+      <SelectTrigger className="w-full bg-white border border-gray-200 shadow-sm">
+        <SelectValue placeholder="Sélectionner un bébé" />
+      </SelectTrigger>
+      <SelectContent>
+        {babies.map((b) => (
+          <SelectItem key={b._id} value={b._id}>
+            {b.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button size="icon" variant="outline">
-            <Plus className="h-4 w-4" />
+    {/* ➕ Ajouter un bébé */}
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="outline" title="Ajouter un bébé">
+          <Plus className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Ajouter un nouveau bébé 🍼</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 mt-3">
+          <Input
+            placeholder="Prénom du bébé"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <Button
+            disabled={saving}
+            onClick={handleAddBaby}
+            className="flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="animate-spin h-4 w-4" />}
+            {saving ? "Ajout..." : "Ajouter"}
           </Button>
-        </DialogTrigger>
+        </div>
+      </DialogContent>
+    </Dialog>
 
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Ajouter un nouveau bébé 🍼</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 mt-3">
-            <Input
-              placeholder="Prénom du bébé"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <Button
-              disabled={saving}
-              onClick={handleAddBaby}
-              className="flex items-center justify-center gap-2"
-            >
-              {saving && <Loader2 className="animate-spin h-4 w-4" />}
-              {saving ? "Ajout..." : "Ajouter"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+    {/* 👩‍👩‍👧 Inviter un parent */}
+    {activeBaby && (
+      <InviteParentDialog
+        babyId={activeBaby}
+        onInvited={(email) => alert(`Invitation envoyée à ${email}`)}
+      />
+    )}
+  </div>
+);
 }

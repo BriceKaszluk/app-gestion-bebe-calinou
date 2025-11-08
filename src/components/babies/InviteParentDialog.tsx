@@ -51,17 +51,17 @@ export default function InviteParentDialog({ babyId, onInvited }: Props) {
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
+          size="icon"
+          className="flex items-center justify-center"
+          title="Inviter un parent"
         >
           <UserPlus2 className="w-4 h-4" />
-          Inviter un parent
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Inviter un autre parent</DialogTitle>
+          <DialogTitle>Inviter un autre parent 👩‍👩‍👧</DialogTitle>
         </DialogHeader>
 
         <p className="text-sm text-gray-600 mb-2">
@@ -73,7 +73,7 @@ export default function InviteParentDialog({ babyId, onInvited }: Props) {
           placeholder="Adresse e-mail du parent"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full"
+          disabled={loading}
         />
 
         <DialogFooter className="mt-4 flex justify-end gap-2">
@@ -82,7 +82,7 @@ export default function InviteParentDialog({ babyId, onInvited }: Props) {
           </Button>
           <Button
             onClick={handleInvite}
-            disabled={loading}
+            disabled={loading || !email.trim()}
             className="flex items-center gap-2"
           >
             {loading && <Loader2 className="animate-spin w-4 h-4" />}
