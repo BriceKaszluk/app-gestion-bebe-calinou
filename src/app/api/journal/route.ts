@@ -1,66 +1,53 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { auth } from "@/auth"; // ✅ le bon import
+import { auth } from "@/auth";
+import { JournalEntrySchema } from "@/lib/validation";
+import { verifyBabyAccess } from "@/lib/babies";
+import { insertJournalEntry, findJournalEntries } from "@/lib/journal";
 
-// ✅ Récupérer toutes les entrées (avec filtres facultatifs)
+export const runtime = "nodejs";
+
+// 🧾 GET — Récupérer les entrées
 export async function GET(req: Request) {
-  const client = await clientPromise;
-  const db = client.db("calinou");
+  const session = await auth();
+  if (!session?.user?.email)
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
   const url = new URL(req.url);
+  const babyId = url.searchParams.get("babyId");
   const filter = url.searchParams.get("filter") || "all";
 
-  const now = new Date();
-  let query: Record<string, unknown> = {};
+  if (!babyId)
+    return NextResponse.json({ error: "babyId requis" }, { status: 400 });
 
-  if (filter === "today") {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    query = { createdAt: { $gte: start, $lte: end } };
-  } else if (filter === "week") {
-    const weekAgo = new Date();
-    weekAgo.setDate(now.getDate() - 7);
-    query = { createdAt: { $gte: weekAgo } };
-  }
+  const access = await verifyBabyAccess(session.user.email, babyId);
+  if (!access)
+    return NextResponse.json({ error: "Accès refusé à ce profil bébé" }, { status: 403 });
 
-  const entries = await db
-    .collection("journal")
-    .find(query)
-    .sort({ createdAt: -1 })
-    .toArray();
-
+  const entries = await findJournalEntries(session.user.email, babyId, filter);
   return NextResponse.json(entries);
 }
 
-// ✅ Ajouter une entrée
+// 📝 POST — Ajouter une note
 export async function POST(req: Request) {
-  const session = await auth(); // ✅ la nouvelle méthode pour récupérer la session
-  if (!session?.user?.email) {
+  const session = await auth();
+  if (!session?.user?.email)
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
 
-  const body = await req.json();
-  const message = body.message?.trim();
+  const json = await req.json();
+  const parsed = JournalEntrySchema.safeParse(json);
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  if (!message) {
-    return NextResponse.json({ error: "Message requis" }, { status: 400 });
-  }
+  const { babyId, message } = parsed.data;
+  const access = await verifyBabyAccess(session.user.email, babyId);
+  if (!access)
+    return NextResponse.json({ error: "Accès refusé à ce profil bébé" }, { status: 403 });
 
-  const client = await clientPromise;
-  const db = client.db("calinou");
-
-  const newEntry = {
+  const entry = await insertJournalEntry({
     userEmail: session.user.email,
+    babyId,
     message,
-    createdAt: new Date(),
-    favorite: false,
-  };
+  });
 
-  const result = await db.collection("journal").insertOne(newEntry);
-
-  return NextResponse.json(
-    { ...newEntry, _id: result.insertedId },
-    { status: 201 }
-  );
+  return NextResponse.json(entry, { status: 201 });
 }

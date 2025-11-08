@@ -1,27 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import JournalForm from "@/components/journal/JournalForm";
 import JournalFilters from "@/components/journal/JournalFilters";
 import JournalList from "@/components/journal/JournalList";
 import { useJournalEntries, Filter } from "@/hooks/useJournalEntries";
 
-export default function Journal() {
-  const { entries, setEntries, loading } = useJournalEntries();
+export default function Journal({ babyId }: { babyId: string }) {
+  const { entries, setEntries, loading } = useJournalEntries(babyId);
   const [filter, setFilter] = useState<Filter>("all");
   const [sending, setSending] = useState(false);
 
+  // 🧠 Recharge les entrées à chaque changement de bébé
+  useEffect(() => {
+    if (!babyId) return;
+    // Si le hook est déjà configuré pour écouter babyId, pas besoin de fetch manuel ici.
+  }, [babyId]);
+
   // ✅ Gestion message + upload image Supabase
   const handleSubmit = async (message: string, file: File | null) => {
-    setSending(true);
+    if (!babyId) {
+      alert("Aucun bébé sélectionné !");
+      return;
+    }
 
+    setSending(true);
     try {
-      // 🔹 1. Création de l’entrée texte
+      // 🔹 1. Création de l’entrée texte liée au bébé
       const res = await fetch("/api/journal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, babyId }),
       });
 
       if (!res.ok) throw new Error("Erreur lors de la création du message");
@@ -54,7 +64,7 @@ export default function Journal() {
         }
       }
 
-      // 🔹 4. Mise à jour du state local
+      // 🔹 4. Mise à jour locale
       setEntries((prev) => [newEntry, ...prev]);
     } catch (error) {
       console.error("Erreur dans handleSubmit:", error);
@@ -72,7 +82,7 @@ export default function Journal() {
     await fetch(`/api/journal/${id}/favorite`, { method: "PATCH" });
   };
 
-  // 🔍 Filtrage
+  // 🔍 Filtrage local
   const filtered = entries.filter((entry) => {
     const d = new Date(entry.createdAt);
     const now = new Date();
@@ -84,30 +94,28 @@ export default function Journal() {
   });
 
   return (
-<Card
-  className="
-    w-full                 /* pleine largeur dans le conteneur centré */
-    max-w-none             /* pas de limite sur mobile */
-    sm:max-w-lg md:max-w-2xl
-    p-3 sm:p-6 rounded-2xl shadow-md bg-white mx-auto
-  "
->
-  <CardHeader>
-    <CardTitle className="text-lg sm:text-xl font-semibold text-center">
-      Journal de bébé 🍼
-    </CardTitle>
-  </CardHeader>
+    <Card
+      className="
+        w-full
+        max-w-none sm:max-w-lg md:max-w-2xl
+        p-3 sm:p-6 rounded-2xl shadow-md bg-white mx-auto
+      "
+    >
+      <CardHeader>
+        <CardTitle className="text-lg sm:text-xl font-semibold text-center">
+          Journal de bébé 🍼
+        </CardTitle>
+      </CardHeader>
 
-  <CardContent className="space-y-4">
-    <JournalForm onSubmit={handleSubmit} loading={sending} />
-    <JournalFilters filter={filter} setFilter={setFilter} />
-    <JournalList
-      entries={filtered}
-      loading={loading}
-      toggleFavorite={toggleFavorite}
-    />
-  </CardContent>
-</Card>
-
+      <CardContent className="space-y-4">
+        <JournalForm onSubmit={handleSubmit} loading={sending} />
+        <JournalFilters filter={filter} setFilter={setFilter} />
+        <JournalList
+          entries={filtered}
+          loading={loading}
+          toggleFavorite={toggleFavorite}
+        />
+      </CardContent>
+    </Card>
   );
 }

@@ -11,16 +11,19 @@ export type Entry = {
   signedUrl?: string;
 };
 
-// ✅ On ajoute "important" ici
 export type Filter = "all" | "today" | "week" | "important";
 
-export function useJournalEntries() {
+export function useJournalEntries(babyId?: string) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!babyId) return; // ⚠️ attend que babyId soit défini
+
     const loadEntries = async () => {
-      const cacheKey = "journalCache";
+      setLoading(true);
+
+      const cacheKey = `journalCache_${babyId}`;
       const cached = localStorage.getItem(cacheKey);
 
       if (cached) {
@@ -32,38 +35,28 @@ export function useJournalEntries() {
         }
       }
 
-      const res = await fetch("/api/journal");
-      if (!res.ok) return setLoading(false);
+      // 🔹 On ajoute babyId dans l’URL !
+      const res = await fetch(`/api/journal?babyId=${babyId}`);
+      if (!res.ok) {
+        setLoading(false);
+        return;
+      }
 
       const data = await res.json();
-      const withUrls = await Promise.all(
-        data.map(async (entry: Entry) => {
-          if (!entry.imagePath) return entry;
-          const urlRes = await fetch("/api/journal/CreateImageSignedUrl", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: entry.imagePath }),
-          });
-          const { url } = await urlRes.json();
-          return { ...entry, signedUrl: url };
-        })
-      );
-
-      setEntries(withUrls);
+      setEntries(data);
       setLoading(false);
 
-      // ✅ Cache local pour performance
       localStorage.setItem(
         cacheKey,
         JSON.stringify({
-          data: withUrls,
-          expiresAt: Date.now() + 55 * 60 * 1000, // 55 min
+          data,
+          expiresAt: Date.now() + 55 * 60 * 1000,
         })
       );
     };
 
     loadEntries();
-  }, []);
+  }, [babyId]);
 
   return { entries, setEntries, loading };
 }
