@@ -1,126 +1,125 @@
+// src/components/babies/BabyParentsList.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBabyStore } from "@/store/useBabyStore";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Trash2 } from "lucide-react";
 
-type Parent = { email: string };
-type Baby = { _id: string; name: string; parents: Parent[] };
+type UserResponse = { email: string };
 
-export default function BabyParentsList({ babyId }: { babyId: string }) {
-  const [baby, setBaby] = useState<Baby | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function BabyParentsList() {
+  const { activeBaby, loadingBabies, revokeParent } = useBabyStore();
+
   const [removing, setRemoving] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [online, setOnline] = useState(true);
 
-  // 🔹 Charge les infos du bébé et l'utilisateur connecté
+  // Email de l'utilisateur connecté
   useEffect(() => {
-    const load = async () => {
+    const controller = new AbortController();
+    (async () => {
       try {
-        const userRes = await fetch("/api/user");
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setUserEmail(userData.email);
-        }
-
-        const res = await fetch(`/api/babies/${babyId}`);
-        if (!res.ok) throw new Error("Erreur récupération bébé");
-
-        const data = await res.json();
-        setBaby(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+        const res = await fetch("/api/user", { signal: controller.signal });
+        if (!res.ok) return;
+        const data = (await res.json()) as UserResponse;
+        setUserEmail(typeof data?.email === "string" ? data.email : null);
+      } catch {
+        // offline/abort
       }
+    })();
+    return () => controller.abort();
+  }, []);
+
+  // Garde offline
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
     };
-    if (babyId) load();
-  }, [babyId]);
+  }, []);
 
-  const handleRemove = async (email: string) => {
-    if (!confirm(`Retirer ${email} de ce bébé ?`)) return;
-    setRemoving(email);
+  const parents = activeBaby?.parents ?? [];
+  const creator: string | null = parents.length > 0 ? parents[0].email : null;
+  const isCreator = userEmail !== null && userEmail === creator;
 
-    const res = await fetch("/api/babies/invite", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ babyId, email }),
-    });
-
-    if (res.ok) {
-      setBaby((prev) =>
-        prev
-          ? { ...prev, parents: prev.parents.filter((p) => p.email !== email) }
-          : prev
-      );
-    } else {
-      const err = await res.json();
-      alert(err.error || "Erreur lors de la révocation");
-    }
-
-    setRemoving(null);
-  };
-
-  if (loading)
+  if (loadingBabies || !activeBaby) {
     return (
       <div className="flex justify-center py-4">
         <Loader2 className="animate-spin text-gray-400" size={20} />
       </div>
     );
+  }
 
-  if (!baby)
-    return (
-      <p className="text-center text-sm text-gray-500">
-        Impossible de charger les parents du bébé.
-      </p>
-    );
+  const { name, _id: babyId } = activeBaby;
 
-  const creator = baby.parents[0]?.email;
-  const isCreator = userEmail === creator;
+  const handleRemove = async (email: string) => {
+    if (!confirm(`Retirer ${email} de ce bébé ?`)) return;
+    setRemoving(email);
+    try {
+      await revokeParent(babyId, email);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      console.error(e);
+      alert(`Erreur lors de la révocation du parent: ${msg}`);
+    } finally {
+      setRemoving(null);
+    }
+  };
 
   return (
     <Card className="p-4 space-y-3 bg-white shadow-sm mb-6">
-      <h2 className="font-semibold text-lg text-center">
-        Parents de {baby.name}
-      </h2>
+      <h2 className="font-semibold text-lg text-center">Parents de {name}</h2>
 
-      <ul className="divide-y divide-gray-200">
-        {baby.parents.map((parent) => (
-          <li
-            key={parent.email}
-            className="flex justify-between items-center py-2"
-          >
-            <span
-              className={`text-sm ${
-                parent.email === creator ? "font-semibold" : ""
-              }`}
-            >
-              {parent.email}
-              {parent.email === creator && (
-                <span className="ml-2 text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">
-                  Créateur
-                </span>
-              )}
-            </span>
+      {parents.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-2">
+          Aucun parent associé.
+        </p>
+      ) : (
+        <ul className="divide-y divide-gray-200">
+          {parents.map((parent) => {
+            const isCreatorBadge = creator !== null && parent.email === creator;
+            const canRemove = isCreator && !isCreatorBadge;
 
-            {isCreator && parent.email !== creator && (
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => handleRemove(parent.email)}
-                disabled={removing === parent.email}
+            return (
+              <li
+                key={parent.email}
+                className="flex justify-between items-center py-2"
               >
-                {removing === parent.email ? (
-                  <Loader2 className="animate-spin h-4 w-4 text-gray-400" />
-                ) : (
-                  <Trash2 className="h-4 w-4 text-red-500" />
+                <span className={`text-sm ${isCreatorBadge ? "font-semibold" : ""}`}>
+                  {parent.email}
+                  {isCreatorBadge && (
+                    <span className="ml-2 text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">
+                      Créateur
+                    </span>
+                  )}
+                </span>
+
+                {canRemove && (
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => void handleRemove(parent.email)}
+                    disabled={removing === parent.email || !online}
+                    aria-label={`Retirer ${parent.email}`}
+                  >
+                    {removing === parent.email ? (
+                      <Loader2 className="animate-spin h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    )}
+                  </Button>
                 )}
-              </Button>
-            )}
-          </li>
-        ))}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </Card>
   );
 }

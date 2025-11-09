@@ -1,94 +1,97 @@
+// src/components/babies/InviteParentDialog.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useBabyStore } from "@/store/useBabyStore";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, UserPlus2 } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 
-type Props = {
-  babyId: string;
-  onInvited?: (email: string) => void;
-};
+type Props = { babyId: string; onInvited?: (email: string) => void };
+
+const isValidEmail = (v: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.toLowerCase());
 
 export default function InviteParentDialog({ babyId, onInvited }: Props) {
+  const { inviteParent, loadBabies } = useBabyStore();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [online, setOnline] = useState(true);
 
-  const handleInvite = async () => {
-    if (!email.trim()) return;
-    setLoading(true);
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
 
-    const res = await fetch("/api/babies/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ babyId, email }),
-    });
-
-    setLoading(false);
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || "Erreur lors de l’invitation");
+  const submit = async () => {
+    const value = email.trim().toLowerCase();
+    if (!isValidEmail(value)) {
+      alert("Email invalide");
       return;
     }
-
-    onInvited?.(email);
-    setEmail("");
-    setOpen(false);
+    setLoading(true);
+    try {
+      await inviteParent(babyId, value);
+      onInvited?.(value);
+      setOpen(false);
+      setEmail("");
+      void loadBabies();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur d’invitation";
+      alert(msg);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const disabled = loading || !isValidEmail(email.trim()) || !online;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="flex items-center justify-center"
-          title="Inviter un parent"
-        >
-          <UserPlus2 className="w-4 h-4" />
+        <Button variant="outline" size="sm" className="whitespace-nowrap" disabled={!online}>
+          <UserPlus className="h-4 w-4 mr-1" /> Inviter
         </Button>
       </DialogTrigger>
-
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Inviter un autre parent 👩‍👩‍👧</DialogTitle>
+          <DialogTitle>Inviter un parent</DialogTitle>
         </DialogHeader>
-
-        <p className="text-sm text-gray-600 mb-2">
-          Entrez l’adresse e-mail du parent à inviter pour partager le suivi de bébé.
-        </p>
-
-        <Input
-          type="email"
-          placeholder="Adresse e-mail du parent"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading}
-        />
-
-        <DialogFooter className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Annuler
+        <div className="flex gap-2">
+          <Input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="email@exemple.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !disabled) void submit();
+            }}
+          />
+          <Button disabled={disabled} onClick={() => void submit()}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Envoyer"}
           </Button>
-          <Button
-            onClick={handleInvite}
-            disabled={loading || !email.trim()}
-            className="flex items-center gap-2"
-          >
-            {loading && <Loader2 className="animate-spin w-4 h-4" />}
-            {loading ? "Envoi..." : "Inviter"}
-          </Button>
-        </DialogFooter>
+        </div>
+        {!online && (
+          <p className="text-xs text-amber-600 mt-2">
+            Hors-ligne — réessaie quand la connexion revient.
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );

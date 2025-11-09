@@ -1,8 +1,8 @@
+// src/components/babies/BabySelector.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import InviteParentDialog from "@/components/babies/InviteParentDialog";
-import { useActiveBaby } from "@/hooks/useActiveBaby";
 import {
   Select,
   SelectTrigger,
@@ -20,118 +20,58 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus } from "lucide-react";
-
-type Baby = { _id: string; name: string };
+import { useBabyStore } from "@/store/useBabyStore";
 
 export default function BabySelector() {
-  const [babies, setBabies] = useState<Baby[]>([]);
-  const [activeBaby, setActiveBaby] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    babies,
+    activeBaby,
+    loadingBabies,
+    saving,
+    init,
+    loadBabies,
+    addBaby,
+    inviteParent,
+    setActiveBabyId,
+  } = useBabyStore();
+
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [saving, setSaving] = useState(false);
 
-  const { setActiveBabyId } = useActiveBaby();
-
-  // 🔁 Fonction réutilisable pour recharger la liste
-  const reloadBabies = async () => {
-    const res = await fetch("/api/babies");
-    const data = await res.json();
-    setBabies(data);
-
-    const saved = localStorage.getItem("activeBabyId");
-    if (!data.some((b: Baby) => b._id === saved)) {
-      localStorage.removeItem("activeBabyId");
-      setActiveBaby(null);
-      setActiveBabyId(null);
-    }
-  };
-
+  // Initialisation (garde interne babiesOnce dans le store)
   useEffect(() => {
-    let cancelled = false;
+    void init();
+  }, [init]);
 
-    const fetchBabies = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/babies");
-        if (!res.ok) throw new Error("Erreur récupération bébés");
-        const data = await res.json();
-        if (cancelled) return;
-        setBabies(data);
-
-        const saved = localStorage.getItem("activeBabyId");
-        if (data.length === 0) {
-          localStorage.removeItem("activeBabyId");
-          setActiveBaby(null);
-          setActiveBabyId(null);
-          return;
-        }
-
-        const validBaby = data.find((b: Baby) => b._id === saved);
-        if (validBaby) {
-          setActiveBaby(validBaby._id);
-          const current = localStorage.getItem("activeBabyId");
-          if (current !== validBaby._id) {
-            setActiveBabyId(validBaby._id);
-          }
-        } else {
-          const first = data[0]._id;
-          localStorage.setItem("activeBabyId", first);
-          setActiveBaby(first);
-          setActiveBabyId(first);
-        }
-      } catch (err) {
-        console.error("Erreur chargement bébés:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchBabies();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleChange = (id: string) => {
-    if (id === activeBaby) return;
-    setActiveBaby(id);
-    setActiveBabyId(id);
-  };
-
-  const handleAddBaby = async () => {
-    if (!newName.trim()) return;
-    setSaving(true);
-    const res = await fetch("/api/babies/new", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      alert("Erreur lors de la création du bébé");
-      return;
-    }
-    const baby = await res.json();
-    setBabies((prev) => [...prev, baby]);
-    localStorage.setItem("activeBabyId", baby._id);
-    setActiveBaby(baby._id);
-    setActiveBabyId(baby._id);
-    setNewName("");
-    setOpen(false);
-  };
-
-  if (loading) {
+  if (loadingBabies) {
     return (
-      <div className="flex justify-center items-center py-3">
+      <div className="flex flex-col items-center gap-2 py-3 text-sm text-gray-500">
         <Loader2 className="animate-spin text-gray-400" size={20} />
+        Chargement des bébés...
       </div>
     );
   }
 
+  const handleSelect = (id: string) => {
+    // setActiveBabyId renvoie Promise<void>
+    void setActiveBabyId(id);
+  };
+
+  const handleCreate = async () => {
+    const created = await addBaby(newName);
+    if (created) {
+      setNewName("");
+      setOpen(false);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-2 mb-4 w-full max-w-xs mx-auto">
-      <Select value={activeBaby || ""} onValueChange={handleChange}>
+    <div className="flex items-center gap-2 mb-4 w-full max-w-sm mx-auto">
+      <Select
+        value={activeBaby?._id ?? ""}
+        onValueChange={handleSelect}
+        disabled={babies.length === 0}
+      >
         <SelectTrigger className="w-full bg-white border border-gray-200 shadow-sm">
           <SelectValue placeholder="Sélectionner un bébé" />
         </SelectTrigger>
@@ -144,26 +84,37 @@ export default function BabySelector() {
         </SelectContent>
       </Select>
 
+      {/* Ajouter un bébé */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button size="icon" variant="outline" title="Ajouter un bébé">
+          <Button
+            size="icon"
+            variant="outline"
+            title="Ajouter un bébé"
+            aria-label="Ajouter un bébé"
+          >
             <Plus className="h-4 w-4" />
           </Button>
         </DialogTrigger>
-
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Ajouter un nouveau bébé 🍼</DialogTitle>
           </DialogHeader>
+
           <div className="flex flex-col gap-3 mt-3">
             <Input
               placeholder="Prénom du bébé"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newName.trim() && !saving) {
+                  void handleCreate();
+                }
+              }}
             />
             <Button
-              disabled={saving}
-              onClick={handleAddBaby}
+              disabled={saving || newName.trim().length === 0}
+              onClick={() => void handleCreate()}
               className="flex items-center justify-center gap-2"
             >
               {saving && <Loader2 className="animate-spin h-4 w-4" />}
@@ -173,12 +124,15 @@ export default function BabySelector() {
         </DialogContent>
       </Dialog>
 
+      {/* Inviter un parent */}
       {activeBaby && (
         <InviteParentDialog
-          babyId={activeBaby}
-          onInvited={async (email) => {
+          babyId={activeBaby._id}
+          onInvited={async (email: string) => {
+            await inviteParent(activeBaby._id, email);
             alert(`Invitation envoyée à ${email}`);
-            await reloadBabies(); // 💡 recharge la liste
+            // Si tu veux rafraîchir la liste (ex: badge d'invitations dans un autre écran)
+            void loadBabies();
           }}
         />
       )}
