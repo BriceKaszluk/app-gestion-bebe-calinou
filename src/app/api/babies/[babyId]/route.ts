@@ -20,10 +20,7 @@ type BabyDoc = {
   invites?: Invite[];
 };
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { babyId: string } }
-) {
+export async function GET(req: Request) {
   try {
     const session = await auth();
     const userEmail = session?.user?.email;
@@ -31,7 +28,12 @@ export async function GET(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const { babyId } = params; // ✅ pas d'await
+    // ✅ Récupérer babyId depuis l’URL (compatible Next 15, pas de 2e arg typé)
+    const pathname = new URL(req.url).pathname; // ex: /api/babies/6719b7.../...
+    const parts = pathname.split("/").filter(Boolean);
+    const babiesIdx = parts.indexOf("babies");
+    const babyId = babiesIdx >= 0 ? parts[babiesIdx + 1] : "";
+
     if (!babyId || !ObjectId.isValid(babyId)) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400 });
     }
@@ -57,9 +59,7 @@ export async function GET(
             },
           ],
         },
-        {
-          projection: { _id: 1, name: 1, parents: 1, invites: 1 }, // projection stricte
-        }
+        { projection: { _id: 1, name: 1, parents: 1, invites: 1 } }
       );
 
     if (!baby) {
@@ -71,8 +71,7 @@ export async function GET(
 
     const isCreator = baby.parents?.[0]?.email === userEmail;
 
-    // Sanitize: seuls les créateurs voient toutes les invitations.
-    // Les autres ne voient que leur propre invitation (utile pour afficher le statut).
+    // Masquer les invites pour les non-créateurs (sauf la leur)
     const invites =
       baby.invites && baby.invites.length > 0
         ? isCreator
@@ -80,15 +79,12 @@ export async function GET(
           : baby.invites.filter((i) => i.email === userEmail)
         : undefined;
 
-    // Normalisation pour le front (évite l'ObjectId côté client)
-    const payload = {
+    return NextResponse.json({
       _id: baby._id.toString(),
       name: baby.name,
       parents: baby.parents,
       ...(invites ? { invites } : {}),
-    };
-
-    return NextResponse.json(payload);
+    });
   } catch (error) {
     console.error("Erreur récupération bébé :", error);
     return NextResponse.json(
