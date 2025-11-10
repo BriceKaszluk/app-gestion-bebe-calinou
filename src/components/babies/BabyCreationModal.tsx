@@ -1,45 +1,32 @@
+// src/components/babies/BabyCreationModal.tsx
 "use client";
 
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { useBabyStore } from "@/store/useBabyStore";
 
 type Props = {
-  onCreated: (babyId: string) => void;
+  onCreated?: (babyId: string) => void; // rendu optionnel
 };
 
 export default function BabyCreationModal({ onCreated }: Props) {
+  const { addBaby, saving } = useBabyStore();
   const [open, setOpen] = useState(true);
   const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
-    setSaving(true);
-
-    const res = await fetch("/api/babies", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-
-    setSaving(false);
-    if (!res.ok) {
+    const n = name.trim();
+    if (!n) return;
+    const baby = await addBaby(n); // ✅ passe par le store (POST /api/babies/new + refresh)
+    if (!baby) {
       alert("Erreur lors de la création du bébé");
       return;
     }
-
-    const data = await res.json();
-    localStorage.setItem("activeBabyId", data.babyId);
     setOpen(false);
-    onCreated(data.babyId);
+    onCreated?.(baby._id);
   };
 
   return (
