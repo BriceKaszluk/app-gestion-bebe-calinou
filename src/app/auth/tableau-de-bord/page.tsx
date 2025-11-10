@@ -1,4 +1,3 @@
-// src/app/tableau-de-bord/page.tsx
 "use client";
 
 import { useEffect } from "react";

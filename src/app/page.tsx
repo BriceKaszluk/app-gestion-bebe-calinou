@@ -17,7 +17,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/tableau-de-bord"); // ✅ aligne partout ce chemin
+      router.replace("/auth/tableau-de-bord"); // ✅ aligne partout ce chemin
     }
   }, [status, router]);
 
@@ -44,7 +44,7 @@ export default function HomePage() {
             <div className="mt-5 flex flex-col items-center gap-2 sm:flex-row sm:items-stretch">
               <Button
                 className="w-full sm:w-auto"
-                onClick={() => signIn("google", { callbackUrl: "/tableau-de-bord" })}
+                onClick={() => signIn("google", { callbackUrl: "/auth/tableau-de-bord" })}
               >
                 Commencer
               </Button>
