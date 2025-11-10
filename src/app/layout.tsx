@@ -28,16 +28,11 @@ export const viewport: Viewport = {
   themeColor: "#facc15",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+// …imports inchangés
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}>
         <ClientLayout>
           <Navbar />
           {children}
