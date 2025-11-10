@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import InviteParentDialog from "@/components/babies/InviteParentDialog";
 import {
   Select,
   SelectTrigger,
@@ -23,42 +22,33 @@ import { Loader2, Plus } from "lucide-react";
 import { useBabyStore } from "@/store/useBabyStore";
 
 export default function BabySelector() {
-  const {
-    babies,
-    activeBaby,
-    loadingBabies,
-    saving,
-    init,
-    loadBabies,
-    addBaby,
-    inviteParent,
-    setActiveBabyId,
-  } = useBabyStore();
+  const { babies, activeBaby, loadingBabies, saving, init, addBaby, setActiveBabyId } =
+    useBabyStore();
 
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
 
-  // Initialisation (garde interne babiesOnce dans le store)
   useEffect(() => {
-    void init();
+    void init(); // init unique (le store gère le garde interne)
   }, [init]);
 
   if (loadingBabies) {
     return (
-      <div className="flex flex-col items-center gap-2 py-3 text-sm text-gray-500">
-        <Loader2 className="animate-spin text-gray-400" size={20} />
-        Chargement des bébés...
+      <div className="flex items-center gap-2 py-3 text-sm text-gray-500">
+        <Loader2 className="animate-spin h-4 w-4" />
+        Chargement des bébés…
       </div>
     );
   }
 
   const handleSelect = (id: string) => {
-    // setActiveBabyId renvoie Promise<void>
     void setActiveBabyId(id);
   };
 
-  const handleCreate = async () => {
-    const created = await addBaby(newName);
+  const handleCreate = async (): Promise<void> => {
+    const name = newName.trim();
+    if (!name) return;
+    const created = await addBaby(name);
     if (created) {
       setNewName("");
       setOpen(false);
@@ -111,6 +101,7 @@ export default function BabySelector() {
                   void handleCreate();
                 }
               }}
+              disabled={saving}
             />
             <Button
               disabled={saving || newName.trim().length === 0}
@@ -123,19 +114,6 @@ export default function BabySelector() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Inviter un parent */}
-      {activeBaby && (
-        <InviteParentDialog
-          babyId={activeBaby._id}
-          onInvited={async (email: string) => {
-            await inviteParent(activeBaby._id, email);
-            alert(`Invitation envoyée à ${email}`);
-            // Si tu veux rafraîchir la liste (ex: badge d'invitations dans un autre écran)
-            void loadBabies();
-          }}
-        />
-      )}
     </div>
   );
 }

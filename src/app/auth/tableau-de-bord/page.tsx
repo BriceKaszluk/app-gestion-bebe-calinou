@@ -5,15 +5,15 @@ import { useEffect } from "react";
 import { useBabyStore } from "@/store/useBabyStore";
 import BabyCreationModal from "@/components/babies/BabyCreationModal";
 import BabySelector from "@/components/BabySelector";
-import BabyParentsList from "@/components/babies/BabyParentsList";
 import BabyTimePad from "@/components/BabyTimePad";
 import Journal from "@/components/Journal";
+import ManageParentsDialog from "@/components/babies/ManageParentsDialog";
 
 export default function DashboardPage() {
   const { babies, activeBaby, loadingBabies, init } = useBabyStore();
 
   useEffect(() => {
-    init(); // init unique (le store gère le garde interne)
+    init();
   }, [init]);
 
   if (loadingBabies) {
@@ -24,7 +24,6 @@ export default function DashboardPage() {
     );
   }
 
-  // 🍼 Aucun bébé existant → on affiche la modal + un empty state derrière
   if (babies.length === 0) {
     return (
       <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6">
@@ -37,29 +36,42 @@ export default function DashboardPage() {
     );
   }
 
-  // 🧸 Interface principale
   return (
     <main className="flex flex-col items-center w-full min-h-screen bg-gray-50 p-4 sm:p-8">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-center">
-        Bienvenue sur votre tableau de bord 👶
-      </h1>
+      {/* h1 invisible pour a11y, sans bruit visuel */}
+      <h1 className="sr-only">Tableau de bord</h1>
 
-      <BabySelector />
+      {/* Barre d’action compacte */}
+      <div className="w-full flex justify-center mb-3">
+        <div className="flex items-center justify-center gap-2 w-full max-w-none sm:max-w-lg md:max-w-2xl">
+          <div className="flex-1">
+            <BabySelector />
+          </div>
+          <ManageParentsDialog />
+        </div>
+      </div>
 
       {!activeBaby ? (
         <p className="text-center text-gray-500 mt-6">
-          Vous n’avez actuellement accès à aucun bébé.
+          Sélectionnez un bébé pour commencer.
         </p>
       ) : (
         <>
-          <div className="w-full max-w-none sm:max-w-lg md:max-w-2xl mx-auto mb-6">
-            <BabyParentsList />
-            <BabyTimePad />
-          </div>
+          {/* 💥 Le cœur de l’app en premier */}
+          <section aria-labelledby="section-timepad" className="w-full">
+            <h2 id="section-timepad" className="sr-only">Raccourcis des événements</h2>
+            <div className="w-full max-w-none sm:max-w-lg md:max-w-2xl mx-auto mb-6">
+              <BabyTimePad />
+            </div>
+          </section>
 
-          <div className="w-full max-w-none sm:max-w-lg md:max-w-2xl mx-auto">
-            <Journal babyId={activeBaby._id} />
-          </div>
+          {/* Journal ensuite */}
+          <section aria-labelledby="section-journal" className="w-full">
+            <h2 id="section-journal" className="sr-only">Journal de bébé</h2>
+            <div className="w-full max-w-none sm:max-w-lg md:max-w-2xl mx-auto">
+              <Journal babyId={activeBaby._id} />
+            </div>
+          </section>
         </>
       )}
     </main>
