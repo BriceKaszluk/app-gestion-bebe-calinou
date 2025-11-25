@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Calinou 👶✨
 
-## Getting Started
+Calinou est une application web PWA-ready pour jeunes parents, construite avec **Next.js 15 (App Router)** et **React 19**.  
+Objectif : **suivre simplement le quotidien de bébé** (biberons, dodos, couches, notes, photos) et **partager ces infos entre parents**.
 
-First, run the development server:
+> 🔴 Important :  
+> L’application **nécessite une connexion Internet**.  
+> Le manifest et le service worker sont en place pour l’installabilité, mais **aucun mode hors-ligne fonctionnel n’est encore implémenté**.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🍼 Fonctionnalités principales
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Timers & suivi du quotidien
+- Boutons rapides pour enregistrer les événements du quotidien :
+  - Sieste / Dodo 😴  
+  - Biberon / Repas 🍼🍽️  
+  - Couches (caca / pipi) 💩  
+- Chaque clic enregistre :
+  - l’heure
+  - la catégorie (biberon, dodo, etc.)
+- L’UI est pensée pour afficher ensuite :
+  - le **temps écoulé depuis le dernier événement** (ex. "Dernier biberon : il y a 1h15")
+  - des métriques futures (statistiques, graphiques…).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Journal de bébé (texte + photos)
+- Journal chronologique des moments importants :
+  - notes texte
+  - photos (stockées sur Supabase Storage)
+- Possibilité de marquer des entrées comme **favoris** (moments à retenir).
+- Affichage optimisé :
+  - **scroll fluide** dans le journal
+  - chargement progressif des images
+  - skeletons / états de chargement pendant l’upload.
+- Les images sont servies via **URLs signées** (Supabase) pour plus de sécurité.
 
-## Learn More
+### 3. Multi-parent & partage des accès
+- Chaque bébé peut avoir **plusieurs parents associés**.
+- Système d’**invitation par e-mail** :
+  - un parent invite l’autre via son adresse e-mail
+  - l’invité voit automatiquement le ou les bébés associés s’il accepte.
+- Côté base de données (MongoDB) :
+  - collection `babies`
+  - champs `parents[]` (liste des parents) et `invites[]` (invitation, statut `pending | accepted | revoked`).
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Authentification sécurisée (NextAuth)
+- Connexion via **Google** (NextAuth + MongoDBAdapter).
+- Session sécurisée côté serveur.
+- Les routes API vérifient systématiquement :
+  - la présence d’une session valide
+  - l’e-mail utilisateur avant de lire / modifier des données.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 5. PWA (installable, mais pas offline)
+- **Manifest PWA** configuré (`public/manifest.json`).
+- **Service worker** présent (`public/sw.js`, via `next-pwa`) pour :
+  - permettre l’installation sur mobile / desktop
+  - gérer la base pour de futures optimisations PWA.
+- Icônes configurées :
+  - `favicon`
+  - `apple-touch-icon`
+  - `themeColor` pour un bon rendu sur mobile.
+- ✅ **Ce qui est en place :**
+  - l’app peut être installée comme une PWA (icône sur l’écran d’accueil).
+- 🔴 **Ce qui n’est pas encore fait :**
+  - aucune stratégie de cache offline fiable
+  - pas de fonctionnement hors-ligne garanti (lecture/écriture de données impossible sans réseau).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 6. UI moderne & responsive
+- Design **mobile-first** avec **Tailwind CSS v4**.
+- Composants **Shadcn UI + Radix** pour :
+  - boutons
+  - cartes
+  - formulaires
+  - dialogues (invitations de parent)
+  - selects (sélecteur de bébé, filtres du journal).
+- Layout responsive :
+  - mobile : cartes centrées, largeur adaptée (~94vw), marges réduites
+  - tablette / desktop : largeur max contrôlée (`max-w-md`, `max-w-lg`, `max-w-2xl`).
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🧱 Stack technique
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Framework** : Next.js 15 – App Router
+- **UI** : React 19, TypeScript
+- **Styles** : Tailwind CSS v4, Shadcn UI, Radix UI
+- **Auth** : NextAuth (Google Provider) + MongoDBAdapter
+- **Base de données** : MongoDB Atlas (driver natif via `clientPromise`)
+- **Stockage d’images** : Supabase Storage (`src/lib/supabase.ts`)
+- **Déploiement** : Vercel
+- **PWA** : `next-pwa`, `public/manifest.json`, `public/sw.js` (installable, pas encore offline-ready)
+
+---
