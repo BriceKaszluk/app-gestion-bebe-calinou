@@ -1,15 +1,11 @@
-// src/app/api/events/route.ts
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { auth } from "@/auth";
 import { verifyBabyAccess } from "@/lib/babies";
+import { EVENT_TYPES, EventType } from "@/lib/timers/schema";
 
 export const runtime = "nodejs";
-
-// Types
-const TYPES = ["biberon", "dodo", "repas", "caca", "pipi", "bain"] as const;
-type EventType = typeof TYPES[number];
 
 type EventDoc = {
   _id: ObjectId;
@@ -31,38 +27,43 @@ export async function POST(req: Request) {
   try {
     const session = await auth();
     const email = session?.user?.email;
-    if (!email) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!email) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
 
     const body = (await req.json()) as
       | { type: EventType; babyId: string; startedAt?: string }
       | { type: "dodo"; babyId: string; endedAt: string };
 
     const { type, babyId } = body as { type: EventType; babyId: string };
-    if (!type || !babyId || !TYPES.includes(type)) {
+
+    if (!type || !babyId || !EVENT_TYPES.includes(type)) {
       return NextResponse.json({ error: "Champs invalides" }, { status: 400 });
     }
 
     if (!(await verifyBabyAccess(email, babyId))) {
-      return NextResponse.json({ error: "Accès refusé à ce bébé" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Accès refusé à ce bébé" },
+        { status: 403 },
+      );
     }
 
     const client = await clientPromise;
     const db = client.db("calinou");
     const col = db.collection<EventDoc>("events");
 
-    // util de date sûre
     const toDate = (iso?: string): Date => {
       const d = iso ? new Date(iso) : new Date();
       return Number.isNaN(d.getTime()) ? new Date() : d;
     };
 
-    // STOP dodo -> on clôt le dernier dodo non terminé, sinon on crée un event instantané
+    // STOP dodo
     if (type === "dodo" && "endedAt" in body && body.endedAt) {
       const endedDate = toDate(body.endedAt);
 
       const { matchedCount } = await col.updateOne(
         { babyId: oid(babyId), type, endedAt: { $exists: false } },
-        { $set: { endedAt: endedDate } }
+        { $set: { endedAt: endedDate } },
       );
 
       if (matchedCount === 0) {
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
           userEmail: email,
           babyId: oid(babyId),
           type,
-          startedAt: endedDate, // même timestamp -> durée 0
+          startedAt: endedDate,
           endedAt: endedDate,
           createdAt: new Date(),
         });
@@ -80,8 +81,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: "Dodo clôturé" });
     }
 
-    // Start dodo OU clic non-dodo -> INSERT d'un nouvel event
-    const startedDate = "startedAt" in body ? toDate(body.startedAt) : new Date();
+    // START dodo ou clic non-dodo
+    const startedDate =
+      "startedAt" in body ? toDate(body.startedAt) : new Date();
 
     await col.insertOne({
       _id: new ObjectId(),
@@ -92,7 +94,10 @@ export async function POST(req: Request) {
       createdAt: new Date(),
     });
 
-    return NextResponse.json({ success: true, message: "Événement enregistré" });
+    return NextResponse.json({
+      success: true,
+      message: "Événement enregistré",
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -105,18 +110,29 @@ export async function GET(req: Request) {
   try {
     const session = await auth();
     const email = session?.user?.email;
-    if (!email) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    if (!email) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 },
+      );
+    }
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type") as EventType | null;
     const babyId = searchParams.get("babyId");
 
-    if (!type || !babyId || !TYPES.includes(type)) {
-      return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
+    if (!type || !babyId || !EVENT_TYPES.includes(type)) {
+      return NextResponse.json(
+        { error: "Paramètres invalides" },
+        { status: 400 },
+      );
     }
 
     if (!(await verifyBabyAccess(email, babyId))) {
-      return NextResponse.json({ error: "Accès refusé à ce bébé" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Accès refusé à ce bébé" },
+        { status: 403 },
+      );
     }
 
     const client = await clientPromise;
@@ -126,25 +142,35 @@ export async function GET(req: Request) {
     let last: EventDoc | null = null;
 
     if (type === "dodo") {
-      // Priorité au dodo en cours, sinon le dernier terminé
+      // Dodo en cours sinon dernier terminé
       last =
         (await col.findOne(
           { babyId: oid(babyId), type, endedAt: { $exists: false } },
-          { sort: { startedAt: -1 }, projection: { _id: 0, type: 1, startedAt: 1, endedAt: 1 } }
+          {
+            sort: { startedAt: -1 },
+            projection: { type: 1, startedAt: 1, endedAt: 1 },
+          },
         )) ??
         (await col.findOne(
           { babyId: oid(babyId), type, endedAt: { $exists: true } },
-          { sort: { endedAt: -1 }, projection: { _id: 0, type: 1, startedAt: 1, endedAt: 1 } }
+          {
+            sort: { endedAt: -1 },
+            projection: { type: 1, startedAt: 1, endedAt: 1 },
+          },
         ));
     } else {
-      // Dernier event par startedAt desc (reset "il y a ..." à chaque clic)
+      // Dernier event
       last = await col.findOne(
         { babyId: oid(babyId), type },
-        { sort: { startedAt: -1 }, projection: { _id: 0, type: 1, startedAt: 1, endedAt: 1 } }
+        {
+          sort: { startedAt: -1 },
+          projection: { type: 1, startedAt: 1, endedAt: 1 },
+        },
       );
     }
 
     if (!last) return NextResponse.json({}); // pas de last
+
     return NextResponse.json({
       last: {
         type: last.type,

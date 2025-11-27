@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useBabyStore } from "@/store/useBabyStore";
 import BabyCreationModal from "@/components/babies/BabyCreationModal";
 import BabySelector from "@/components/BabySelector";
-import BabyTimePad from "@/components/BabyTimePad";
+import { BabyPadTabs } from "@/components/babies/BabyPadTabs";
 import Journal from "@/components/Journal";
 import ManageParentsDialog from "@/components/babies/ManageParentsDialog";
 
@@ -60,7 +60,7 @@ export default function DashboardPage() {
           <section aria-labelledby="section-timepad" className="w-full">
             <h2 id="section-timepad" className="sr-only">Raccourcis des événements</h2>
             <div className="w-full max-w-none sm:max-w-lg md:max-w-2xl mx-auto mb-6">
-              <BabyTimePad />
+              <BabyPadTabs />
             </div>
           </section>
 
