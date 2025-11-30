@@ -7,7 +7,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
-import BabyTimePad from "../BabyTimePad";
+import BabyTimePad from "./BabyTimePad";
 import { BabyStatsOverview } from "./BabyStatsOverview";
 
 type TabValue = "timers" | "stats";
