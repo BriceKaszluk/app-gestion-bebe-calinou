@@ -7,7 +7,7 @@ import clientPromise from "@/lib/mongodb";
 import { verifyBabyAccess } from "@/lib/babies";
 import {
   EVENT_TYPES,
-  EventType,
+  type EventType,
   dayEventsResponseSchema,
 } from "@/lib/timers/schema";
 
@@ -70,7 +70,10 @@ export async function GET(req: Request) {
 
   const target = date ? new Date(date) : new Date();
   if (Number.isNaN(target.getTime())) {
-    return NextResponse.json({ error: "Date invalide" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Date invalide" },
+      { status: 400 },
+    );
   }
 
   target.setHours(0, 0, 0, 0);
@@ -82,12 +85,28 @@ export async function GET(req: Request) {
   const db = client.db("calinou");
   const col = db.collection<EventDoc>("events");
 
-  const query: Record<string, unknown> = {
+  const baseQuery: Record<string, unknown> = {
     babyId: new ObjectId(babyId),
-    startedAt: { $gte: start, $lt: end },
   };
+  if (type) {
+    baseQuery.type = type;
+  }
 
-  if (type) query.type = type;
+  const query: Record<string, unknown> = {
+    ...baseQuery,
+    $or: [
+      // 1) events instantanés (pas de endedAt) : dans la journée
+      {
+        endedAt: { $exists: false },
+        startedAt: { $gte: start, $lt: end },
+      },
+      // 2) events avec durée : chevauchent la journée [start, end)
+      {
+        startedAt: { $lt: end },
+        endedAt: { $exists: true, $gt: start },
+      },
+    ],
+  };
 
   const docs = await col
     .find(query)

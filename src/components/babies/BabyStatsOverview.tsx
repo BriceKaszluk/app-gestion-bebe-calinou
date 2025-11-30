@@ -19,18 +19,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBabyDayEvents } from "@/hooks/useBabyDayEvents";
 
-// Chargement lazy des composants de graphique
 const DayTimelineChart = dynamic(
   () =>
-    import("./DayTimelineChart").then((m) => m.DayTimelineChart),
+    import("./charts/DayTimelineChart").then((m) => m.DayTimelineChart),
   { ssr: false },
 );
 
 const SleepTimelineChart = dynamic(
   () =>
-    import("./DayTimelineChart").then((m) => m.SleepTimelineChart),
+    import("./charts/SleepTimelineChart").then((m) => m.SleepTimelineChart),
   { ssr: false },
 );
+
 
 const TYPE_LABELS = {
   biberon: {
@@ -65,14 +65,15 @@ const TYPE_LABELS = {
 export function BabyStatsOverview() {
   const { activeBaby } = useBabyStore();
 
-  const {
-    offset,
-    setOffset,
-    weekdayLabel,
-    data,
-    loading,
-    error,
-  } = useBabyDayEvents(activeBaby?._id);
+const {
+  offset,
+  setOffset,
+  weekdayLabel,
+  currentDate,
+  data,
+  loading,
+  error,
+} = useBabyDayEvents(activeBaby?._id);
 
   if (!activeBaby) {
     return (
@@ -119,7 +120,7 @@ export function BabyStatsOverview() {
         weekdayLabel={weekdayLabel}
       />
 
-      <EventCards data={data} />
+      <EventCards data={data} currentDate={currentDate} />
     </div>
   );
 }
@@ -166,9 +167,12 @@ function HeaderRow({
 
 interface EventCardsProps {
   data: DayEventsResponse | null;
+  currentDate: Date;
 }
 
-function EventCards({ data }: EventCardsProps) {
+
+
+function EventCards({ data, currentDate }: EventCardsProps) {
   return (
     <>
       {EVENT_TYPES.map((t) => {
@@ -192,15 +196,12 @@ function EventCards({ data }: EventCardsProps) {
                 {meta.description}
               </p>
             </CardHeader>
-
             <CardContent>
-              {eventsForType.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Aucun événement enregistré pour ce type sur cette
-                  journée.
-                </p>
-              ) : t === "dodo" ? (
-                <SleepTimelineChart events={eventsForType} />
+              {t === "dodo" ? (
+                <SleepTimelineChart
+                  events={eventsForType}
+                  day={currentDate}
+                />
               ) : (
                 <DayTimelineChart type={t as TimerType} events={eventsForType} />
               )}
