@@ -3,7 +3,8 @@ import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { auth } from "@/auth";
 import { verifyBabyAccess } from "@/lib/babies";
-import { EVENT_TYPES, EventType } from "@/lib/timers/schema";
+import { z } from "zod";
+import { EVENT_TYPES, type EventType } from "@/lib/timers/schema";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,31 @@ function oid(id: string) {
   return new ObjectId(id);
 }
 
+const NON_DODO_TYPES = EVENT_TYPES.filter(
+  (t) => t !== "dodo",
+) as [EventType, ...EventType[]];
+
+const postSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("dodo"),
+    babyId: z.string().min(1),
+    endedAt: z.string().datetime().optional(),
+    startedAt: z.string().datetime().optional(),
+  }),
+  z.object({
+    type: z.enum(NON_DODO_TYPES),
+    babyId: z.string().min(1),
+    startedAt: z.string().datetime().optional(),
+  }),
+]);
+
+const getSchema = z.object({
+  type: z.enum(EVENT_TYPES),
+  babyId: z.string().min(1),
+});
+
+const defaultError = { error: "Erreur serveur" } as const;
+
 // -------------------- POST --------------------
 export async function POST(req: Request) {
   try {
@@ -31,15 +57,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const body = (await req.json()) as
-      | { type: EventType; babyId: string; startedAt?: string }
-      | { type: "dodo"; babyId: string; endedAt: string };
+    const json = await req.json();
+    const parsed = postSchema.safeParse(json);
 
-    const { type, babyId } = body as { type: EventType; babyId: string };
-
-    if (!type || !babyId || !EVENT_TYPES.includes(type)) {
+    if (!parsed.success) {
       return NextResponse.json({ error: "Champs invalides" }, { status: 400 });
     }
+
+    const body = parsed.data;
+    const { type, babyId } = body;
 
     if (!(await verifyBabyAccess(email, babyId))) {
       return NextResponse.json(
@@ -58,7 +84,7 @@ export async function POST(req: Request) {
     };
 
     // STOP dodo
-    if (type === "dodo" && "endedAt" in body && body.endedAt) {
+    if (type === "dodo" && body.endedAt) {
       const endedDate = toDate(body.endedAt);
 
       const { matchedCount } = await col.updateOne(
@@ -82,8 +108,7 @@ export async function POST(req: Request) {
     }
 
     // START dodo ou clic non-dodo
-    const startedDate =
-      "startedAt" in body ? toDate(body.startedAt) : new Date();
+    const startedDate = toDate(body.startedAt);
 
     await col.insertOne({
       _id: new ObjectId(),
@@ -100,7 +125,7 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(defaultError, { status: 500 });
   }
 }
 
@@ -118,15 +143,18 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type") as EventType | null;
-    const babyId = searchParams.get("babyId");
+    const parsed = getSchema.safeParse(
+      Object.fromEntries(searchParams.entries()),
+    );
 
-    if (!type || !babyId || !EVENT_TYPES.includes(type)) {
+    if (!parsed.success) {
       return NextResponse.json(
         { error: "Paramètres invalides" },
         { status: 400 },
       );
     }
+
+    const { type, babyId } = parsed.data;
 
     if (!(await verifyBabyAccess(email, babyId))) {
       return NextResponse.json(
@@ -180,6 +208,6 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(defaultError, { status: 500 });
   }
 }

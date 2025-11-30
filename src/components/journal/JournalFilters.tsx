@@ -1,18 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Filter } from "@/hooks/useJournalEntries";
+import type { JournalFilter } from "@/lib/journal";
 
 type Props = {
-  filter: Filter;
-  setFilter: (f: Filter) => void;
+  filter: JournalFilter;
+  setFilter: (f: JournalFilter) => void;
 };
 
 export default function JournalFilters({ filter, setFilter }: Props) {
   // 🆕 Ajout du filtre important
-  const filters: Filter[] = ["all", "today", "week", "important"];
+  const filters: JournalFilter[] = ["all", "today", "week", "important"];
 
-  const labelMap: Record<Filter, string> = {
+  const labelMap: Record<JournalFilter, string> = {
     all: "Tous",
     today: "Aujourd’hui",
     week: "7 jours",
@@ -26,7 +26,7 @@ export default function JournalFilters({ filter, setFilter }: Props) {
       {/* 🧭 Mobile : menu déroulant */}
       <select
         value={filter}
-        onChange={(e) => setFilter(e.target.value as Filter)}
+        onChange={(e) => setFilter(e.target.value as JournalFilter)}
         className="block sm:hidden w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
       >
         {filters.map((f) => (

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useBabyStore } from "@/store/useBabyStore";
 import type { EventType } from "@/store/useBabyStore";
+import { formatDurationShort, timeSince } from "@/lib/time";
 
 type ActionDef = {
   id: EventType;
@@ -42,7 +43,7 @@ export default function BabyTimePad() {
       const d = events.dodo;
       if (d?.startedAt && !d.endedAt) {
         const secs = Math.floor((Date.now() - new Date(d.startedAt).getTime()) / 1000);
-        setDodoDuration(formatDuration(secs));
+        setDodoDuration(formatDurationShort(secs));
       } else {
         setDodoDuration("—");
       }
@@ -88,7 +89,7 @@ export default function BabyTimePad() {
                 (new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime()) / 1000
               )
             );
-            label = `Durant ${formatDuration(durSecs)} — il y a ${timeSince(
+            label = `Durant ${formatDurationShort(durSecs)} — il y a ${timeSince(
               new Date(e.endedAt)
             )}`;
           } else if (e?.startedAt) {
@@ -130,25 +131,4 @@ export default function BabyTimePad() {
       })}
     </div>
   );
-}
-
-/* ---------- Utils ---------- */
-
-function timeSince(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "moins d’1 min";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins ? `${hours}h ${mins}min` : `${hours}h`;
-}
-
-function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "—";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins ? `${hours}h ${mins}min` : `${hours}h`;
 }

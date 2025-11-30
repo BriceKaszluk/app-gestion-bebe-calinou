@@ -3,19 +3,16 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { auth } from "@/auth";
+import { z } from "zod";
+import type { BabyDoc, InviteStatus } from "@/lib/babies";
+import { normalizeEmail } from "@/lib/babies";
 
 export const runtime = "nodejs";
 
-type Parent = { email: string };
-type InviteStatus = "pending" | "accepted" | "revoked";
-type Invite = { email: string; invitedBy: string; invitedAt: Date; status: InviteStatus };
-type BabyDoc = {
-  _id: ObjectId;
-  name: string;
-  createdAt: Date;
-  parents: Parent[];
-  invites?: Invite[];
-};
+const bodySchema = z.object({
+  babyId: z.string().trim().min(1),
+  email: z.string().trim().email(),
+});
 
 const oid = (id: string) => {
   if (!ObjectId.isValid(id)) throw new Error("Invalid ObjectId");
@@ -32,13 +29,13 @@ export async function POST(req: Request) {
     }
 
     // Body
-    const { babyId, email } = (await req.json()) as { babyId?: string; email?: string };
-    if (!babyId || !email) {
-      return NextResponse.json({ error: "babyId et email requis" }, { status: 400 });
+    const json = await req.json();
+    const parsed = bodySchema.safeParse(json);
+    if (!parsed.success || !ObjectId.isValid(parsed.data.babyId)) {
+      return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
     }
-    if (!ObjectId.isValid(babyId)) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
-    }
+    const babyId = parsed.data.babyId;
+    const targetEmail = normalizeEmail(parsed.data.email);
 
     const client = await clientPromise;
     const db = client.db("calinou");
@@ -53,7 +50,7 @@ export async function POST(req: Request) {
     }
 
     // Le demandeur doit être parent
-    const isMember = baby.parents.some((p) => p.email === requesterEmail);
+    const isMember = baby.parents.some((p) => normalizeEmail(p.email) === requesterEmail);
     if (!isMember) {
       return NextResponse.json({ error: "Accès refusé à ce bébé" }, { status: 403 });
     }
@@ -66,12 +63,14 @@ export async function POST(req: Request) {
     }
 
     // On ne peut pas supprimer le créateur
-    if (email === creatorEmail) {
+    if (targetEmail === creatorEmail) {
       return NextResponse.json({ error: "Impossible de supprimer le créateur" }, { status: 400 });
     }
 
     // Le parent ciblé doit exister
-    const targetExists = baby.parents.some((p) => p.email === email);
+    const targetExists = baby.parents.some(
+      (p) => normalizeEmail(p.email) === targetEmail,
+    );
     if (!targetExists) {
       return NextResponse.json({ error: "Parent cible introuvable" }, { status: 404 });
     }
@@ -85,10 +84,10 @@ export async function POST(req: Request) {
     const res = await db.collection<BabyDoc>("babies").updateOne(
       { _id: oid(babyId) },
       {
-        $pull: { parents: { email } },
+        $pull: { parents: { email: targetEmail } },
         $set: { "invites.$[elem].status": "revoked" as InviteStatus },
       },
-      { arrayFilters: [{ "elem.email": email }] }
+      { arrayFilters: [{ "elem.email": targetEmail }] },
     );
 
     if (res.modifiedCount === 0) {

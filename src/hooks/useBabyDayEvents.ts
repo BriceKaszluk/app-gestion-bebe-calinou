@@ -5,13 +5,7 @@ import {
   type DayEventsResponse,
   dayEventsResponseSchema,
 } from "@/lib/timers/schema";
-
-function formatDateYYYYMMDD(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { formatDateKey } from "@/lib/timers/day";
 
 type UseBabyDayEventsResult = {
   offset: number;
@@ -60,7 +54,7 @@ export function useBabyDayEvents(
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + offset);
-    const dateKey = formatDateYYYYMMDD(d);
+    const dateKey = formatDateKey(d);
     const cacheKey = `${babyId}:${dateKey}`;
     const cached = cacheRef.current[cacheKey];
 

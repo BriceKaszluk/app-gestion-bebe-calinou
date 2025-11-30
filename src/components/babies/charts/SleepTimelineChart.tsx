@@ -13,132 +13,13 @@ import {
 
 import type { DayEvent } from "@/lib/timers/schema";
 import { useChartSize } from "@/hooks/useChartSize";
-import {
-  DayTooltip,
-  HOUR_TICKS,
-  Point,
-} from "./chartsShared";
+import { buildSleepSegmentsForDay } from "@/lib/timers/sleep";
+import { DayTooltip, HOUR_TICKS, Point } from "./chartsShared";
+import { buildSleepChartPoints } from "./sleepChartUtils";
 
 interface SleepTimelineChartProps {
   events: DayEvent[];
   day: Date;
-}
-
-type SleepSegment = {
-  id: string;
-  startTime: number;
-  endTime: number;
-  label: string;
-  showStartIcon: boolean;
-  showEndIcon: boolean;
-};
-
-type SleepIconPoint = Point;
-
-/* ---------- Utils sommeil ---------- */
-
-function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function addDays(d: Date, days: number): Date {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function buildSleepSegmentsForDay(
-  events: DayEvent[],
-  day: Date,
-): { segments: SleepSegment[]; points: Point[]; iconPoints: SleepIconPoint[] } {
-  if (events.length === 0) {
-    return { segments: [], points: [], iconPoints: [] };
-  }
-
-  const dayStart = startOfDay(day);
-  const dayEnd = addDays(dayStart, 1);
-
-  const dayStartTime = dayStart.getTime();
-  const oneMinute = 60 * 1000;
-
-  const segments: SleepSegment[] = [];
-
-  for (const ev of events) {
-    if (!ev.startedAt || !ev.endedAt) continue;
-
-    const rawStart = new Date(ev.startedAt);
-    const rawEnd = new Date(ev.endedAt as string);
-
-    // event touche ce jour ?
-    const intersects =
-      rawEnd > dayStart && rawStart < dayEnd; // [start, end) ∩ [dayStart, dayEnd) ≠ ∅
-    if (!intersects) continue;
-
-    // clip dans [dayStart, dayEnd]
-    const startMs = Math.max(rawStart.getTime(), dayStart.getTime());
-    const endMs = Math.min(rawEnd.getTime(), dayEnd.getTime());
-    if (endMs <= startMs) continue;
-
-    const startMinutes = (startMs - dayStartTime) / oneMinute;
-    const endMinutes = (endMs - dayStartTime) / oneMinute;
-
-    const startTime = startMinutes / 60; // 0–24
-    const endTime = endMinutes / 60;
-
-    const label = `${rawStart.toLocaleTimeString("fr-FR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })} → ${rawEnd.toLocaleTimeString("fr-FR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-
-    const startInDay = rawStart >= dayStart && rawStart < dayEnd;
-    const endInDay = rawEnd > dayStart && rawEnd <= dayEnd;
-
-    segments.push({
-      id: ev.id,
-      startTime,
-      endTime,
-      label,
-      showStartIcon: startInDay,
-      showEndIcon: endInDay,
-    });
-  }
-
-  const points: Point[] = segments.map((seg) => ({
-    id: seg.id,
-    time: (seg.startTime + seg.endTime) / 2,
-    y: 0.5,
-    label: seg.label,
-    kind: "segment",
-  }));
-
-  const iconPoints: SleepIconPoint[] = [];
-  for (const seg of segments) {
-    if (seg.showStartIcon) {
-      iconPoints.push({
-        id: `${seg.id}-start`,
-        time: seg.startTime,
-        y: 0.5,
-        label: "",
-        kind: "sleep-start",
-      });
-    }
-    if (seg.showEndIcon) {
-      iconPoints.push({
-        id: `${seg.id}-end`,
-        time: seg.endTime,
-        y: 0.5,
-        label: "",
-        kind: "sleep-end",
-      });
-    }
-  }
-
-  return { segments, points, iconPoints };
 }
 
 /* ---------- Composant ---------- */
@@ -146,10 +27,12 @@ function buildSleepSegmentsForDay(
 export function SleepTimelineChart({ events, day }: SleepTimelineChartProps) {
   const { containerRef, size } = useChartSize();
 
-  const { segments, points, iconPoints } = React.useMemo(
-    () => buildSleepSegmentsForDay(events, day),
-    [events, day],
-  );
+  const { segments, points, iconPoints } = React.useMemo(() => {
+    const builtSegments = buildSleepSegmentsForDay(events, day);
+    const { points, iconPoints } = buildSleepChartPoints(builtSegments);
+
+    return { segments: builtSegments, points, iconPoints };
+  }, [events, day]);
 
   const SLEEP_START_ICON = "😴";
   const SLEEP_END_ICON = "😀";

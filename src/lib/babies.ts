@@ -21,6 +21,7 @@ export type BabyDoc = {
 };
 
 const norm = (s: string) => s.trim().toLowerCase();
+export const normalizeEmail = norm;
 
 async function getDb() {
   const client = await clientPromise;

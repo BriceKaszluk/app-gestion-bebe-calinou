@@ -1,22 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import JournalForm from "@/components/journal/JournalForm";
 import JournalFilters from "@/components/journal/JournalFilters";
 import JournalList from "@/components/journal/JournalList";
-import { useJournalEntries, Filter } from "@/hooks/useJournalEntries";
+import { useJournalEntries } from "@/hooks/useJournalEntries";
+import type { JournalFilter, JournalEntryDto } from "@/lib/journal";
 
 export default function Journal({ babyId }: { babyId: string }) {
   const { entries, setEntries, loading } = useJournalEntries(babyId);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<JournalFilter>("all");
   const [sending, setSending] = useState(false);
-
-  // 🧠 Recharge les entrées à chaque changement de bébé
-  useEffect(() => {
-    if (!babyId) return;
-    // Si le hook est déjà configuré pour écouter babyId, pas besoin de fetch manuel ici.
-  }, [babyId]);
 
   // ✅ Gestion message + upload image Supabase
   const handleSubmit = async (message: string, file: File | null) => {
@@ -35,7 +30,7 @@ export default function Journal({ babyId }: { babyId: string }) {
       });
 
       if (!res.ok) throw new Error("Erreur lors de la création du message");
-      const newEntry = await res.json();
+      const newEntry = (await res.json()) as JournalEntryDto;
 
       // 🔹 2. Upload image si présente
       if (file) {

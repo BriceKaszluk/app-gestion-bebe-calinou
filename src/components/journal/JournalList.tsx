@@ -6,10 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Pin } from "lucide-react";
-import { Entry } from "@/hooks/useJournalEntries";
+import type { JournalEntryDto } from "@/lib/journal";
 
 type Props = {
-  entries: Entry[];
+  entries: JournalEntryDto[];
   loading: boolean;
   toggleFavorite: (id: string) => void;
 };

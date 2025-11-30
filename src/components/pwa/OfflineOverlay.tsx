@@ -1,4 +1,4 @@
-// src/components/OfflineOverlay.tsx
+// src/components/pwa/OfflineOverlay.tsx
 "use client";
 
 import { useState } from "react";

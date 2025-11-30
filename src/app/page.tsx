@@ -3,12 +3,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import OfflineOverlay from "@/components/OfflineOverlay";
-import { Timer, Camera, Users, WifiOff } from "lucide-react";
 import Image from "next/image";
 import interfacePreview from "@/public/interface-exemple.png";
+import { Timer, Camera, Users, WifiOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import OfflineOverlay from "@/components/pwa/OfflineOverlay";
 
 export default function HomePage() {
   const { status } = useSession();

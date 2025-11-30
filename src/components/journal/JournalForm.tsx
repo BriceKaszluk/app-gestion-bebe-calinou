@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import ImagePreview from "@/components/ImagePreview";
+import ImagePreview from "@/components/journal/ImagePreview";
 
 type Props = {
   onSubmit: (message: string, file: File | null) => Promise<void>;

@@ -1,34 +1,29 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
+import { z } from "zod";
 import clientPromise from "@/lib/mongodb";
 import { auth } from "@/auth";
+import type { BabyDoc, InviteStatus } from "@/lib/babies";
+import { normalizeEmail } from "@/lib/babies";
+import { babyDocToDto } from "@/lib/babies/dto";
 
 export const runtime = "nodejs";
-
-type InviteStatus = "pending" | "accepted" | "revoked";
-type Parent = { email: string };
-type Invite = {
-  email: string;
-  invitedBy: string;
-  invitedAt: Date;
-  status: InviteStatus;
-};
-type BabyDoc = {
-  _id: ObjectId;
-  name: string;
-  createdAt: Date;
-  parents: Parent[];
-  invites?: Invite[];
-};
-
-const TYPESAFE_OK = { ok: true } as const;
 
 const oid = (id: string) => {
   if (!ObjectId.isValid(id)) throw new Error("Invalid ObjectId");
   return new ObjectId(id);
 };
-const normEmail = (v: string) => v.trim().toLowerCase();
-const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+const TYPESAFE_OK = { ok: true } as const;
+
+const querySchema = z.object({
+  babyId: z.string().trim().min(1),
+});
+
+const inviteSchema = z.object({
+  babyId: z.string().trim().min(1),
+  email: z.string().trim().email(),
+});
 
 /** ✅ GET: liste les invitations d’un bébé (créateur = toutes, sinon seulement la sienne) */
 export async function GET(req: Request) {
@@ -38,10 +33,14 @@ export async function GET(req: Request) {
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const babyId = searchParams.get("babyId");
-    if (!babyId || !ObjectId.isValid(babyId)) {
+    const parsed = querySchema.safeParse(
+      Object.fromEntries(searchParams.entries()),
+    );
+
+    if (!parsed.success || !ObjectId.isValid(parsed.data.babyId)) {
       return NextResponse.json({ error: "babyId invalide" }, { status: 400 });
     }
+    const babyId = parsed.data.babyId;
 
     const client = await clientPromise;
     const db = client.db("calinou");
@@ -62,15 +61,9 @@ export async function GET(req: Request) {
     const visibleInvites =
       userEmail === creator ? invites : invites.filter((i) => i.email.toLowerCase() === userEmail);
 
-    // Sérialisation minimale
     return NextResponse.json({
       ok: true,
-      invites: visibleInvites.map((i) => ({
-        email: i.email,
-        invitedBy: i.invitedBy,
-        invitedAt: i.invitedAt.toISOString?.() ?? new Date(i.invitedAt).toISOString(),
-        status: i.status,
-      })),
+      invites: babyDocToDto({ ...baby, invites: visibleInvites }).invites ?? [],
     });
   } catch (e) {
     console.error("GET /babies/invite error:", e);
@@ -85,16 +78,15 @@ export async function POST(req: Request) {
     const requester = session?.user?.email?.toLowerCase() ?? null;
     if (!requester) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const body = (await req.json()) as { babyId?: string; email?: string };
-    const babyId = body.babyId?.trim();
-    const target = body.email ? normEmail(body.email) : "";
+    const body = await req.json();
+    const parsed = inviteSchema.safeParse(body);
 
-    if (!babyId || !ObjectId.isValid(babyId)) {
-      return NextResponse.json({ error: "babyId invalide" }, { status: 400 });
+    if (!parsed.success || !ObjectId.isValid(parsed.data.babyId)) {
+      return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
     }
-    if (!target || !isEmail(target)) {
-      return NextResponse.json({ error: "Email invalide" }, { status: 400 });
-    }
+
+    const babyId = parsed.data.babyId;
+    const target = normalizeEmail(parsed.data.email);
 
     const client = await clientPromise;
     const db = client.db("calinou");
@@ -143,13 +135,19 @@ export async function POST(req: Request) {
     }
 
     // Sinon → on crée une invitation pending
-    const invite: Invite = {
-      email: target,
-      invitedBy: requester,
-      invitedAt: new Date(),
-      status: "pending",
-    };
-    await babies.updateOne({ _id: baby._id }, { $push: { invites: invite } });
+    await babies.updateOne(
+      { _id: baby._id },
+      {
+        $push: {
+          invites: {
+            email: target,
+            invitedBy: requester,
+            invitedAt: new Date(),
+            status: "pending" as InviteStatus,
+          },
+        },
+      },
+    );
 
     return NextResponse.json({ ...TYPESAFE_OK, status: "created" as const });
   } catch (e) {
@@ -165,16 +163,14 @@ export async function DELETE(req: Request) {
     const requester = session?.user?.email?.toLowerCase() ?? null;
     if (!requester) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const body = (await req.json()) as { babyId?: string; email?: string };
-    const babyId = body.babyId?.trim();
-    const target = body.email ? normEmail(body.email) : "";
+    const body = await req.json();
+    const parsed = inviteSchema.safeParse(body);
+    if (!parsed.success || !ObjectId.isValid(parsed.data.babyId)) {
+      return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
+    }
 
-    if (!babyId || !ObjectId.isValid(babyId)) {
-      return NextResponse.json({ error: "babyId invalide" }, { status: 400 });
-    }
-    if (!target || !isEmail(target)) {
-      return NextResponse.json({ error: "Email invalide" }, { status: 400 });
-    }
+    const { babyId, email } = parsed.data;
+    const target = normalizeEmail(email);
 
     const client = await clientPromise;
     const db = client.db("calinou");

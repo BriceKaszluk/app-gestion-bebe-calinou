@@ -2,27 +2,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-export type Entry = {
-  _id: string;
-  message?: string;        // 💡 texte parfois absent (entrée image seule)
-  createdAt: string;
-  favorite?: boolean;
-  imagePath?: string;
-  signedUrl?: string;
-};
-
-export type Filter = "all" | "today" | "week" | "important";
+import type { JournalEntryDto } from "@/lib/journal";
 
 type CacheShape = {
-  entries: Entry[];
+  entries: JournalEntryDto[];
   expiresAt: number;
 };
 
 const TTL_MS = 55 * 60 * 1000; // 55 min
 
 export function useJournalEntries(babyId?: string) {
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const [entries, setEntries] = useState<JournalEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [bump, setBump] = useState(0); // permet de forcer un refresh
 
@@ -71,7 +61,9 @@ export function useJournalEntries(babyId?: string) {
         );
         if (!res.ok) throw new Error("Erreur chargement journal");
 
-        const data = (await res.json()) as { entries?: Entry[] } | Entry[];
+        const data = (await res.json()) as
+          | { entries?: JournalEntryDto[] }
+          | JournalEntryDto[];
         const next = Array.isArray(data) ? data : data.entries ?? [];
 
         if (!aborted) {

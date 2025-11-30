@@ -1,24 +1,17 @@
 import { NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { auth } from "@/auth";
+import { z } from "zod";
+import type { BabyDoc } from "@/lib/babies";
+import { babyDocToDto } from "@/lib/babies/dto";
 
 export const runtime = "nodejs";
 
-type Parent = { email: string };
-type Invite = {
-  email: string;
-  invitedBy: string;
-  invitedAt: Date;
-  status: "pending" | "accepted" | "revoked";
-};
-type BabyDoc = {
-  _id: ObjectId;
-  name: string;
-  createdAt: Date;
-  parents: Parent[];
-  invites?: Invite[];
-};
+const babyInputSchema = z.object({
+  name: z.string().trim().min(1, "Nom du bébé requis"),
+});
+
+const defaultError = { error: "Erreur serveur" } as const;
 
 // 🍼 Création d’un profil bébé
 export async function POST(req: Request) {
@@ -27,10 +20,13 @@ export async function POST(req: Request) {
     if (!session?.user?.email)
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const { name } = await req.json();
-    if (!name || typeof name !== "string")
+    const json = await req.json();
+    const parsed = babyInputSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json({ error: "Nom du bébé requis" }, { status: 400 });
+    }
 
+    const { name } = parsed.data;
     const client = await clientPromise;
     const db = client.db("calinou");
 
@@ -45,23 +41,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await db.collection<Omit<BabyDoc, "_id">>("babies").insertOne({
+    const newBaby: Omit<BabyDoc, "_id"> = {
       name,
       createdAt: new Date(),
       parents: [{ email: session.user.email }],
       invites: [],
-    });
+    };
+
+    const result = await db.collection<Omit<BabyDoc, "_id">>("babies").insertOne(newBaby);
 
     return NextResponse.json({
       message: "Profil bébé créé avec succès",
-      babyId: result.insertedId,
+      babyId: result.insertedId.toHexString(),
     });
   } catch (error) {
     console.error("Erreur création bébé:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la création du profil bébé" },
-      { status: 500 }
-    );
+    return NextResponse.json(defaultError, { status: 500 });
   }
 }
 
@@ -134,9 +129,11 @@ export async function GET() {
       ])
       .toArray();
 
-    return NextResponse.json(babies);
+    const payload = babies.map(babyDocToDto);
+
+    return NextResponse.json(payload);
   } catch (error) {
     console.error("Erreur récupération bébés:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(defaultError, { status: 500 });
   }
 }

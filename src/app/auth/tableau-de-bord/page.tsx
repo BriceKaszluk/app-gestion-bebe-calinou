@@ -5,7 +5,7 @@ import { useBabyStore } from "@/store/useBabyStore";
 import BabyCreationModal from "@/components/babies/BabyCreationModal";
 import BabySelector from "@/components/babies/BabySelector";
 import { BabyPadTabs } from "@/components/babies/BabyPadTabs";
-import Journal from "@/components/Journal";
+import Journal from "@/components/journal/Journal";
 import ManageParentsDialog from "@/components/babies/ManageParentsDialog";
 
 export default function DashboardPage() {

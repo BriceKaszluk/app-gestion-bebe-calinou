@@ -10,6 +10,7 @@ import {
   type EventType,
   dayEventsResponseSchema,
 } from "@/lib/timers/schema";
+import { formatDateKey, getDayBounds } from "@/lib/timers/day";
 
 export const runtime = "nodejs";
 
@@ -28,13 +29,6 @@ const querySchema = z.object({
   date: z.string().optional(), // "YYYY-MM-DD"
   type: z.enum(EVENT_TYPES).optional(),
 });
-
-function formatDateYYYYMMDD(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -76,10 +70,7 @@ export async function GET(req: Request) {
     );
   }
 
-  target.setHours(0, 0, 0, 0);
-  const start = target;
-  const end = new Date(start);
-  end.setDate(start.getDate() + 1);
+  const { start, end } = getDayBounds(target);
 
   const client = await clientPromise;
   const db = client.db("calinou");
@@ -114,7 +105,7 @@ export async function GET(req: Request) {
     .toArray();
 
   const payload = {
-    date: formatDateYYYYMMDD(start),
+    date: formatDateKey(start),
     babyId,
     type: type ?? null,
     events: docs.map((doc) => ({
