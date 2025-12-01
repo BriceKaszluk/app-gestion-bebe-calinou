@@ -71,7 +71,6 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db("calinou");
 
-    // 🔄 Accepte automatiquement les invitations "pending"
     const pendingInvites = await db
       .collection<BabyDoc>("babies")
       .find({ "invites.email": userEmail, "invites.status": "pending" })
@@ -88,13 +87,10 @@ export async function GET() {
       );
     }
 
-    // ✅ Étape clé : ne récupérer que les bébés accessibles
-    // On exclut :
-    //  - ceux dont l’utilisateur n’est plus parent
-    //  - ceux dont son invitation est "revoked"
+    // 👇 ICI : typer l’aggregate
     const babies = await db
       .collection<BabyDoc>("babies")
-      .aggregate([
+      .aggregate<BabyDoc>([
         {
           $match: {
             $or: [
@@ -110,7 +106,6 @@ export async function GET() {
             ],
           },
         },
-        // 🚫 Exclure tout bébé où l’utilisateur est explicitement marqué "revoked"
         {
           $match: {
             $nor: [

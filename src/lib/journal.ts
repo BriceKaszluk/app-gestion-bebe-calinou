@@ -14,6 +14,8 @@ type JournalEntryDoc = {
   signedUrl?: string;
 };
 
+type JournalEntryInsert = Omit<JournalEntryDoc, "_id">;
+
 export type JournalEntryDto = {
   _id: string;
   message?: string;
@@ -46,7 +48,7 @@ export async function insertJournalEntry(
   const client = await clientPromise;
   const db = client.db("calinou");
 
-  const newEntry: JournalEntryDoc = {
+  const newEntry: JournalEntryInsert = {
     userEmail: entry.userEmail,
     babyId: new ObjectId(entry.babyId),
     message: entry.message,
@@ -54,7 +56,7 @@ export async function insertJournalEntry(
     favorite: false,
   };
 
-  const result = await db.collection<JournalEntryDoc>("journal").insertOne(newEntry);
+  const result = await db.collection<JournalEntryInsert>("journal").insertOne(newEntry);
   return toDto({ ...newEntry, _id: result.insertedId });
 }
 

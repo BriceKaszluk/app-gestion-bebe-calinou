@@ -2,11 +2,15 @@
 import withPWA from "next-pwa";
 import type { NextConfig } from "next";
 
+const disablePwa =
+  process.env.NEXT_ENABLE_PWA !== "true" ||
+  process.env.NODE_ENV === "development";
+
 const withPWAConfig = withPWA({
-  dest: "public",        // 📦 génère le service worker et manifest ici
-  register: true,        // auto-enregistrement du SW
-  skipWaiting: true,     // active la nouvelle version sans rechargement
-  disable: process.env.NODE_ENV === "development", // désactivé en dev
+  dest: "public", // 📦 génère le service worker et manifest ici
+  register: true, // auto-enregistrement du SW
+  skipWaiting: true, // active la nouvelle version sans rechargement
+  disable: disablePwa,
 });
 
 export const experimental = {
