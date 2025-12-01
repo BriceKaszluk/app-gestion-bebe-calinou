@@ -1,93 +1,125 @@
 # Calinou 👶✨
 
-Calinou est une application web PWA-ready pour jeunes parents, construite avec **Next.js 15 (App Router)** et **React 19**.  
-Objectif : **suivre simplement le quotidien de bébé** (biberons, dodos, couches, notes, photos) et **partager ces infos entre parents**.
+Calinou est une application web installable (PWA-ready) pour jeunes parents, construite avec Next.js 15 (App Router) et React 19.
+Objectif : suivre simplement le quotidien de bébé (biberons, dodos, couches, bain, notes, photos) et partager ces infos entre parents.
 
-> 🔴 Important :  
-> L’application **nécessite une connexion Internet**.  
-> Le manifest et le service worker sont en place pour l’installabilité, mais **aucun mode hors-ligne fonctionnel n’est encore implémenté**.
+🔴 **Important**
+L’application nécessite une connexion Internet.
+Le manifest et le service worker permettent l’installabilité, mais **aucun mode hors-ligne n’est activé** pour éviter les conflits de données entre plusieurs parents.
 
 ---
 
 ## 🍼 Fonctionnalités principales
 
 ### 1. Timers & suivi du quotidien
-- Boutons rapides pour enregistrer les événements du quotidien :
-  - Sieste / Dodo 😴  
-  - Biberon / Repas 🍼🍽️  
-  - Couches (caca / pipi) 💩  
-- Chaque clic enregistre :
-  - l’heure
-  - la catégorie (biberon, dodo, etc.)
-- L’UI est pensée pour afficher ensuite :
-  - le **temps écoulé depuis le dernier événement** (ex. "Dernier biberon : il y a 1h15")
-  - des métriques futures (statistiques, graphiques…).
 
-### 2. Journal de bébé (texte + photos)
-- Journal chronologique des moments importants :
-  - notes texte
-  - photos (stockées sur Supabase Storage)
-- Possibilité de marquer des entrées comme **favoris** (moments à retenir).
-- Affichage optimisé :
-  - **scroll fluide** dans le journal
-  - chargement progressif des images
-  - skeletons / états de chargement pendant l’upload.
-- Les images sont servies via **URLs signées** (Supabase) pour plus de sécurité.
+Boutons rapides pour enregistrer chaque événement du quotidien :
 
-### 3. Multi-parent & partage des accès
-- Chaque bébé peut avoir **plusieurs parents associés**.
-- Système d’**invitation par e-mail** :
-  - un parent invite l’autre via son adresse e-mail
-  - l’invité voit automatiquement le ou les bébés associés s’il accepte.
-- Côté base de données (MongoDB) :
-  - collection `babies`
-  - champs `parents[]` (liste des parents) et `invites[]` (invitation, statut `pending | accepted | revoked`).
+- Dodo / Sieste 😴
+- Biberon / Repas 🍼🍽️
+- Couches :
+- Caca 💩
+- Pipi 💧
+- Bain 🛁
 
-### 4. Authentification sécurisée (NextAuth)
-- Connexion via **Google** (NextAuth + MongoDBAdapter).
-- Session sécurisée côté serveur.
-- Les routes API vérifient systématiquement :
-  - la présence d’une session valide
-  - l’e-mail utilisateur avant de lire / modifier des données.
+Chaque action enregistre automatiquement :
 
-### 5. PWA (installable, mais pas offline)
-- **Manifest PWA** configuré (`public/manifest.json`).
-- **Service worker** présent (`public/sw.js`, via `next-pwa`) pour :
-  - permettre l’installation sur mobile / desktop
-  - gérer la base pour de futures optimisations PWA.
-- Icônes configurées :
-  - `favicon`
-  - `apple-touch-icon`
-  - `themeColor` pour un bon rendu sur mobile.
-- ✅ **Ce qui est en place :**
-  - l’app peut être installée comme une PWA (icône sur l’écran d’accueil).
-- 🔴 **Ce qui n’est pas encore fait :**
-  - aucune stratégie de cache offline fiable
-  - pas de fonctionnement hors-ligne garanti (lecture/écriture de données impossible sans réseau).
+- l’heure exacte
+- la catégorie (biberon, dodo, etc.)
 
-### 6. UI moderne & responsive
-- Design **mobile-first** avec **Tailwind CSS v4**.
-- Composants **Shadcn UI + Radix** pour :
-  - boutons
-  - cartes
-  - formulaires
-  - dialogues (invitations de parent)
-  - selects (sélecteur de bébé, filtres du journal).
-- Layout responsive :
-  - mobile : cartes centrées, largeur adaptée (~94vw), marges réduites
-  - tablette / desktop : largeur max contrôlée (`max-w-md`, `max-w-lg`, `max-w-2xl`).
+L’interface affiche ensuite :
+
+- le temps écoulé depuis le dernier événement (ex. "Dernier biberon : il y a 1h15")
+- les métriques utiles à la journée
+
+---
+
+### 2. Statistiques de la journée (nouveau)
+
+Une vue dédiée pour analyser la journée en un coup d’œil :
+
+- fréquence des événements
+- répartition des biberons / repas / dodos / couches / bains
+- visualisation timeline (Recharts)
+- segments de sommeil affichés clairement
+- icônes adaptées sur le graphique (🍼 😴 💩 etc.)
+
+Optimisations :
+
+- chargement sélectif des données du jour
+- rendu client léger (charts isolés côté client)
+
+---
+
+### 3. Journal de bébé (texte + photos)
+
+- Journal chronologique : notes + photos
+- Upload sécurisé via Supabase Storage
+- Favoris
+- Lazy loading des images
+- Skeletons pendant l’upload
+- URLs signées pour la sécurité
+
+---
+
+### 4. Multi-parent & partage des accès
+
+- Un bébé peut avoir 1 ou plusieurs parents associés
+- Invitations par e-mail
+- Gestion des statuts : `pending`, `accepted`, `revoked`
+
+Base MongoDB :
+
+- collection `babies`
+- `parents[]` : liste des parents autorisés
+- `invites[]` : invitations liées au bébé
+
+---
+
+### 5. Authentification sécurisée (NextAuth)
+
+- Connexion via Google
+- Sessions sécurisées
+- Vérification stricte dans chaque route API :
+  - session valide
+  - e-mail correspondant à un parent du bébé
+
+---
+
+### 6. PWA (installable, mais pas offline pour le moment)
+
+- Manifest configuré
+- Service worker minimal
+- Icônes pour mobile et desktop
+- Ajout sur l’écran d’accueil possible
+
+🧠 **Pourquoi pas d’offline ?**
+
+- Deux parents peuvent modifier les données du même bébé.
+- Un mode hors-ligne entraînerait des conflits impossibles à résoudre proprement sans CRDT ou système temps réel.
+- Pour garantir l’exactitude des informations, l’application reste en ligne uniquement.
+
+---
+
+### 7. UI moderne & responsive
+
+- Mobile-first
+- Tailwind CSS v4
+- Composants Shadcn UI + Radix
+- Layout fluide :
+  - mobile : largeur 94vw
+  - tablette : `max-w-md` / `max-w-lg`
+  - desktop : `max-w-2xl`
 
 ---
 
 ## 🧱 Stack technique
 
-- **Framework** : Next.js 15 – App Router
-- **UI** : React 19, TypeScript
-- **Styles** : Tailwind CSS v4, Shadcn UI, Radix UI
-- **Auth** : NextAuth (Google Provider) + MongoDBAdapter
-- **Base de données** : MongoDB Atlas (driver natif via `clientPromise`)
-- **Stockage d’images** : Supabase Storage (`src/lib/supabase.ts`)
-- **Déploiement** : Vercel
-- **PWA** : `next-pwa`, `public/manifest.json`, `public/sw.js` (installable, pas encore offline-ready)
-
----
+- Framework : Next.js 15 – App Router
+- UI : React 19, TypeScript
+- Styles : Tailwind CSS v4, Shadcn UI, Radix UI
+- Auth : NextAuth (Google Provider) + MongoDBAdapter
+- DB : MongoDB Atlas (`clientPromise`)
+- Images : Supabase Storage (`src/lib/supabase.ts`)
+- Déploiement : Vercel
+- PWA : installable (manifest + sw), mais pas de cache offline
